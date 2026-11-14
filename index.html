@@ -108,13 +108,24 @@
 
     <!-- ==================== 1. CUSTOMER VIEW ==================== -->
     <section id="view-customer" class="view-section hidden">
-      <!-- Top Table Number Input & Waiter Call Bar -->
+      <!-- Top Table Number (0 or Empty = Takeaway) & Upfront Guest/People Count Bar -->
       <div class="bg-white rounded-2xl p-4 shadow-sm border border-teal-100 mb-5 flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">
-          <div class="bg-teal-50 border-2 border-teal-500 text-teal-950 px-3.5 py-2 rounded-xl font-extrabold text-sm flex items-center gap-2">
+          <!-- Table Number Input: 0 or Blank = Takeaway -->
+          <div class="bg-teal-50 border-2 border-teal-500 text-teal-950 px-3.5 py-2 rounded-xl font-extrabold text-sm flex flex-wrap items-center gap-2">
             <span>🪑</span>
-            <label for="customer-table-input" data-i18n="table_label">የጠረጴዛ ቁጥርዎን ያስገቡ:</label>
-            <input type="number" id="customer-table-input" min="1" max="50" value="1" onchange="changeCustomerTable(this.value)" oninput="changeCustomerTable(this.value)" class="w-16 bg-white border-2 border-teal-600 rounded-lg px-2 py-1 text-center text-teal-950 font-extrabold text-base focus:outline-none" />
+            <label for="customer-table-input" data-i18n="table_label">ጠረጴዛ ቁጥር:</label>
+            <input type="number" id="customer-table-input" min="0" max="50" placeholder="0" onchange="changeCustomerTable(this.value)" oninput="changeCustomerTable(this.value)" class="w-16 bg-white border-2 border-teal-600 rounded-lg px-2 py-1 text-center text-teal-950 font-extrabold text-base focus:outline-none" />
+            <span id="table-mode-badge" class="text-[11px] bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-lg font-extrabold">🛍️ Takeaway (0 / ባዶ)</span>
+          </div>
+
+          <!-- Upfront People / Guest Count Selector (Available immediately when ordering!) -->
+          <div class="bg-emerald-50 border-2 border-emerald-500 text-emerald-950 px-3.5 py-2 rounded-xl font-extrabold text-sm flex items-center gap-2">
+            <span>👥</span>
+            <span data-i18n="guest_count_label">የሰው ብዛት:</span>
+            <button type="button" onclick="changeSplitCount(-1)" class="w-7 h-7 rounded-lg bg-white border border-emerald-400 hover:bg-emerald-100 font-extrabold text-emerald-950 flex items-center justify-center">-</button>
+            <span id="upfront-guest-count" class="font-extrabold text-base min-w-[24px] text-center">1</span>
+            <button type="button" onclick="changeSplitCount(1)" class="w-7 h-7 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold flex items-center justify-center">+</button>
           </div>
         </div>
 
@@ -501,7 +512,7 @@
   <div id="modal-cart" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
       <div class="brand-gradient text-white p-4 flex items-center justify-between">
-        <h3 class="font-extrabold text-lg">የእርስዎ ትዕዛዝ — ጠረጴዛ #<span id="modal-cart-table">1</span></h3>
+        <h3 id="modal-cart-heading" class="font-extrabold text-lg">የእርስዎ ትዕዛዝ — 🛍️ Takeaway</h3>
         <button onclick="toggleModal('modal-cart', false)" class="text-white/80 hover:text-white text-xl font-bold">✕</button>
       </div>
       <div class="p-4 overflow-y-auto flex-1 space-y-4">
@@ -727,7 +738,7 @@ const DEFAULT_HOUSE_SPECIAL = {
 let currentLang = 'am';
 let currentTab = 'customer';
 let currentCategory = 'all';
-let customerTable = 1;
+let customerTable = 'Takeaway'; // Default 0/blank = Takeaway until table >= 1 is entered
 let splitCount = 1;
 let isAddonMode = false;
 let cart = {};
@@ -1099,6 +1110,20 @@ function orderTodaysSpecial() {
     : `⭐ ${sp.en} (${sp.price} ETB) added to cart!`);
 }
 
+function formatTableDisplay(tbl) {
+  if (tbl === 'Takeaway' || tbl === 0 || tbl === '0' || tbl === '' || tbl === null || tbl === undefined) {
+    return currentLang === 'am' ? '🛍️ Takeaway (ይዞ የሚሄድ)' : '🛍️ Takeaway';
+  }
+  return currentLang === 'am' ? `🪑 ጠረጴዛ #${tbl}` : `🪑 Table #${tbl}`;
+}
+
+function parseCustomerTableInput(rawVal) {
+  if (rawVal === null || rawVal === undefined || String(rawVal).trim() === '') return 'Takeaway';
+  const num = parseInt(rawVal, 10);
+  if (isNaN(num) || num <= 0) return 'Takeaway';
+  return num;
+}
+
 // ==================== 8. ROLE & URL ROUTING ====================
 function initRouting() {
   const params = new URLSearchParams(window.location.search);
@@ -1106,12 +1131,13 @@ function initRouting() {
   const tableParam = parseInt(params.get('table'), 10);
 
   const tableInput = document.getElementById('customer-table-input');
-  if (tableParam && tableParam >= 1 && tableParam <= 50) {
+  if (!isNaN(tableParam) && tableParam >= 1 && tableParam <= 50) {
     customerTable = tableParam;
     tableInput.value = tableParam;
   } else {
-    customerTable = parseInt(tableInput.value, 10) || 1;
+    customerTable = parseCustomerTableInput(tableInput.value);
   }
+  updateTableModeBadge();
 
   const nav = document.getElementById('main-nav');
   const rolePill = document.getElementById('role-pill');
@@ -1191,15 +1217,25 @@ function toggleModal(id, show) {
 }
 
 // ==================== 9. CUSTOMER LOGIC & CLEAR ADD-ON BILL CALCULATION ====================
+function updateTableModeBadge() {
+  const badge = document.getElementById('table-mode-badge');
+  if (!badge) return;
+  if (customerTable === 'Takeaway') {
+    badge.className = 'text-[11px] bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-lg font-extrabold';
+    badge.textContent = currentLang === 'am' ? '🛍️ Takeaway (0 / ባዶ)' : '🛍️ Takeaway (0 / Blank)';
+  } else {
+    badge.className = 'text-[11px] bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-1 rounded-lg font-extrabold';
+    badge.textContent = currentLang === 'am' ? `✓ ጠረጴዛ #${customerTable}` : `✓ Table #${customerTable}`;
+  }
+}
+
 function changeCustomerTable(val) {
-  const parsed = parseInt(val, 10);
-  if (!parsed || parsed < 1) return;
-  customerTable = parsed;
+  customerTable = parseCustomerTableInput(val);
   isAddonMode = false;
-  document.getElementById('modal-cart-table').textContent = customerTable;
+  updateTableModeBadge();
   const pill = document.getElementById('role-pill');
   if (!pill.classList.contains('hidden') && pill.textContent.startsWith('CUSTOMER')) {
-    pill.textContent = `CUSTOMER • TABLE ${customerTable}`;
+    pill.textContent = customerTable === 'Takeaway' ? 'CUSTOMER • TAKEAWAY' : `CUSTOMER • TABLE ${customerTable}`;
   }
   renderCustomerView();
 }
@@ -1356,17 +1392,20 @@ function updateFloatingCartBar() {
   if (totalQty > 0) {
     bar.classList.remove('hidden');
     document.getElementById('cart-count-badge').textContent = totalQty;
+    const locText = customerTable === 'Takeaway' ? '🛍️ Takeaway' : (currentLang === 'am' ? `ጠረጴዛ #${customerTable}` : `Table #${customerTable}`);
+    const guestText = splitCount > 1 ? (currentLang === 'am' ? ` • ${splitCount} ሰው` : ` • ${splitCount} Guests`) : '';
     if (activeOrder) {
       const prevTotal = calculateOrderTotals(activeOrder).combinedTotal;
       document.getElementById('cart-bar-subtitle').textContent = currentLang === 'am'
-        ? `ከቅድሙ (${prevTotal} ETB) ጋር ሲደመር (ጠረጴዛ #${customerTable})`
-        : `Added to Initial (${prevTotal} ETB) • Table #${customerTable}`;
+        ? `ከቅድሙ (${prevTotal} ETB) ጋር ሲደመር (${locText}${guestText})`
+        : `Added to Initial (${prevTotal} ETB) • ${locText}${guestText}`;
       document.getElementById('cart-bar-total').textContent = `${prevTotal} + ${newSubtotal} = ${prevTotal + newSubtotal} ETB`;
     } else {
       document.getElementById('cart-bar-subtitle').textContent = currentLang === 'am'
-        ? `የተመረጡ ትዕዛዞች (ጠረጴዛ #${customerTable})`
-        : `Selected Items (Table #${customerTable})`;
-      document.getElementById('cart-bar-total').textContent = `${newSubtotal} ETB`;
+        ? `የተመረጡ ትዕዛዞች (${locText}${guestText})`
+        : `Selected Items (${locText}${guestText})`;
+      const perPersonNote = splitCount > 1 ? ` (${Math.ceil(newSubtotal / splitCount)} ETB / ሰው)` : '';
+      document.getElementById('cart-bar-total').textContent = `${newSubtotal} ETB${perPersonNote}`;
     }
   } else {
     bar.classList.add('hidden');
@@ -1386,7 +1425,11 @@ function selectTip(amount) {
 }
 
 function renderCartModal() {
-  document.getElementById('modal-cart-table').textContent = customerTable;
+  const headingEl = document.getElementById('modal-cart-heading');
+  if (headingEl) {
+    const locLabel = customerTable === 'Takeaway' ? '🛍️ Takeaway' : (currentLang === 'am' ? `🪑 ጠረጴዛ #${customerTable}` : `🪑 Table #${customerTable}`);
+    headingEl.textContent = currentLang === 'am' ? `የእርስዎ ትዕዛዝ — ${locLabel}` : `Your Order — ${locLabel}`;
+  }
   const list = document.getElementById('cart-items-list');
   const subtotal = getCartSubtotal();
   const entries = Object.entries(cart);
@@ -1436,17 +1479,25 @@ function renderCartModal() {
       </div>
     `;
   } else {
+    const splitLine = splitCount > 1
+      ? `<div class="flex justify-between text-xs font-extrabold text-emerald-800 bg-emerald-100/80 px-2.5 py-1.5 rounded-lg mt-1">
+           <span>👥 ${currentLang === 'am' ? `ለ ${splitCount} ሰዎች ሲከፋፈል (ለአንድ ሰው):` : `Split for ${splitCount} Guests (Per Person):`}</span>
+           <span>${Math.ceil(currentAddition / splitCount)} ETB</span>
+         </div>`
+      : '';
     summaryBox.innerHTML = `
       <div class="flex justify-between"><span>${currentLang === 'am' ? 'ንዑስ ድምር:' : 'Subtotal:'}</span><span class="font-bold">${subtotal} ETB</span></div>
       <div class="flex justify-between"><span>${currentLang === 'am' ? 'ጉርሻ (Tip):' : 'Tip:'}</span><span class="font-bold">${selectedTip} ETB</span></div>
       <div class="flex justify-between text-base font-extrabold text-emerald-950 border-t border-teal-200 pt-1.5 mt-1.5">
         <span>${currentLang === 'am' ? 'ጠቅላላ ድምር:' : 'Grand Total:'}</span><span class="text-teal-700">${currentAddition} ETB</span>
       </div>
+      ${splitLine}
     `;
   }
 }
 
 function getActiveTableOrder(tableNum) {
+  if (tableNum === 'Takeaway' || tableNum === 0 || tableNum === '0' || !tableNum) return null;
   return sharedState.orders.find(o => Number(o.table) === Number(tableNum) && o.status !== 'paid');
 }
 
@@ -1470,8 +1521,10 @@ function submitCustomerOrder() {
   const entries = Object.entries(cart);
   if (entries.length === 0) return;
 
-  const tableVal = parseInt(document.getElementById('customer-table-input').value, 10) || customerTable || 1;
+  const rawInput = document.getElementById('customer-table-input').value;
+  const tableVal = parseCustomerTableInput(rawInput);
   customerTable = tableVal;
+  updateTableModeBadge();
   const effectiveItems = getEffectiveMenuItems(true);
 
   const newItems = entries.map(([id, qty]) => {
@@ -1505,10 +1558,15 @@ function submitCustomerOrder() {
     });
   } else {
     const subtotal = newItems.reduce((sum, i) => sum + i.price * i.qty, 0);
+    const isTakeaway = customerTable === 'Takeaway';
+    const locTitle = isTakeaway ? '🛍️ Takeaway' : `ጠረጴዛ #${customerTable}`;
+    const guestTag = splitCount > 1 ? ` (${splitCount} ሰው)` : '';
+
     const orderObj = {
       id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
       table: customerTable,
-      source: 'QR Scan',
+      guestCount: splitCount,
+      source: isTakeaway ? 'QR Takeaway' : 'QR Scan',
       status: 'active',
       items: newItems,
       pendingItems: [],
@@ -1526,12 +1584,13 @@ function submitCustomerOrder() {
     sharedState.alerts.unshift({
       id: `neword_${Date.now()}`,
       channel: 'customer',
-      text: `🆕 ጠረጴዛ #${customerTable}: አዲስ ትዕዛዝ (${subtotal + Number(selectedTip)} ETB) ገብቷል!`,
+      text: `🆕 ${locTitle}${guestTag}: አዲስ ትዕዛዝ (${subtotal + Number(selectedTip)} ETB) ገብቷል!`,
       seen: false,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
   }
 
+  const confirmedLoc = customerTable === 'Takeaway' ? '🛍️ Takeaway' : `ጠረጴዛ #${customerTable}`;
   cart = {};
   selectedTip = 0;
   isAddonMode = false;
@@ -1539,7 +1598,7 @@ function submitCustomerOrder() {
   toggleModal('modal-cart', false);
   updateFloatingCartBar();
   saveSharedState();
-  showToast(currentLang === 'am' ? `ትዕዛዝዎ ለጠረጴዛ #${customerTable} ተልኳል!` : `Order sent for Table #${customerTable}!`);
+  showToast(currentLang === 'am' ? `ትዕዛዝዎ (${confirmedLoc}) ለኪችን፣ ባሬስታ እና ካሸር ተልኳል!` : `Order (${confirmedLoc}) sent to Kitchen, Barista & Cashier!`);
 }
 
 function enableAddonMode() {
@@ -1557,21 +1616,28 @@ function cancelAddonMode() {
 
 function changeSplitCount(delta) {
   splitCount = Math.max(1, splitCount + delta);
+  const upfrontEl = document.getElementById('upfront-guest-count');
+  if (upfrontEl) upfrontEl.textContent = splitCount;
   renderCustomerView();
+  if (!document.getElementById('modal-cart').classList.contains('hidden')) {
+    renderCartModal();
+  }
 }
 
 function callWaiter() {
-  const tableVal = parseInt(document.getElementById('customer-table-input').value, 10) || customerTable || 1;
-  customerTable = tableVal;
+  const rawInput = document.getElementById('customer-table-input').value;
+  customerTable = parseCustomerTableInput(rawInput);
+  updateTableModeBadge();
+  const locText = customerTable === 'Takeaway' ? '🛍️ Takeaway' : `ጠረጴዛ #${customerTable}`;
   sharedState.alerts.unshift({
     id: `waiter_${Date.now()}`,
     channel: 'customer',
-    text: `🔔 ጠረጴዛ #${customerTable}: ደንበኛው አስተናጋጅ ጠርቷል!`,
+    text: `🔔 ${locText}: ደንበኛው አስተናጋጅ ጠርቷል!`,
     seen: false,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
   saveSharedState();
-  showToast(currentLang === 'am' ? `ጠረጴዛ #${customerTable} አስተናጋጅ ጠርቷል!` : `Waiter notified for Table #${customerTable}!`);
+  showToast(currentLang === 'am' ? `${locText} አስተናጋጅ ጠርቷል!` : `Waiter notified for ${locText}!`);
 }
 
 function renderCustomerView() {
@@ -1716,7 +1782,7 @@ function renderStationKDS(station) {
           <div class="flex items-center justify-between border-b border-teal-100 pb-2.5 mb-3">
             <div>
               <div class="flex items-center gap-2">
-                <span class="text-base font-extrabold text-emerald-950">🪑 ጠረጴዛ #${order.table}</span>
+                <span class="text-base font-extrabold text-emerald-950">${order.table === 'Takeaway' ? '🛍️ Takeaway' : '🪑 ጠረጴዛ #' + order.table}</span>
                 ${isNew ? '<span class="bg-red-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md">አዲስ / NEW</span>' : ''}
                 ${currentSub === 'served' ? `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md">✓ ${currentLang === 'am' ? 'ተስተናግዷል' : 'Served'}</span>` : ''}
               </div>
@@ -1777,7 +1843,7 @@ function markItemReady(orderId, itemUid, station) {
     sharedState.alerts.unshift({
       id: `rdy_${Date.now()}`,
       channel: station,
-      text: `✅ ጠረጴዛ #${order.table}: ${item.qty}x ${item.am} (${stationName}) ተዘጋጅቷል!`,
+      text: `✅ ${order.table === 'Takeaway' ? '🛍️ Takeaway' : 'ጠረጴዛ #' + order.table}: ${item.qty}x ${item.am} (${stationName}) ተዘጋጅቷል!`,
       seen: false,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
@@ -1976,14 +2042,16 @@ function renderCashierView() {
       return `
         <div class="p-3 rounded-xl border border-teal-100 bg-teal-50/40 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p class="font-extrabold text-sm text-emerald-950">ጠረጴዛ #${o.table} • ${o.id} <span class="text-xs font-normal text-teal-700">(${o.createdAt} • ${o.source})</span></p>
+            <p class="font-extrabold text-sm text-emerald-950">${o.table === 'Takeaway' ? '🛍️ Takeaway' : '🪑 ጠረጴዛ #' + o.table}${o.guestCount > 1 ? ' (' + o.guestCount + ' ሰው)' : ''} • ${o.id} <span class="text-xs font-normal text-teal-700">(${o.createdAt} • ${o.source})</span></p>
             <p class="text-xs text-gray-700">${o.items.map(i => `${i.qty}x ${i.am}`).join(', ')}</p>
           </div>
           <div class="flex items-center gap-2">
             <span class="font-extrabold text-sm text-emerald-950">${totals.combinedTotal} ETB</span>
             ${o.status === 'paid'
               ? `<button onclick="showFiscalReceiptGuide('${o.id}')" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-extrabold px-2.5 py-1 rounded-lg">✓ ተከፍሏል (🧾 ደረሰኝ)</button>`
-              : `<button onclick="openCashierTableModal(${o.table})" class="brand-gradient text-white text-xs font-bold px-3 py-1 rounded-lg">አስተዳድር</button>`
+              : (o.table === 'Takeaway'
+                ? `<button onclick="confirmTablePaid('${o.id}')" class="brand-gradient text-white text-xs font-bold px-3 py-1 rounded-lg">💵 Takeaway ክፍያ ዝጋ</button>`
+                : `<button onclick="openCashierTableModal(${o.table})" class="brand-gradient text-white text-xs font-bold px-3 py-1 rounded-lg">አስተዳድር</button>`)
             }
           </div>
         </div>
@@ -2147,7 +2215,7 @@ function showFiscalReceiptGuide(orderId) {
   const body = document.getElementById('receipt-guide-body');
   body.innerHTML = `
     <div class="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl">
-      <p class="font-extrabold text-emerald-950 text-base">✅ ጠረጴዛ #${order.table} ክፍያ (${order.total} ETB) ተረጋግጧል!</p>
+      <p class="font-extrabold text-emerald-950 text-base">✅ ${order.table === 'Takeaway' ? '🛍️ Takeaway' : 'ጠረጴዛ #' + order.table} ክፍያ (${order.total} ETB) ተረጋግጧል!</p>
       <p class="text-xs text-teal-800 mt-1">በፊስካል ማሽን (Fiscal Machine) ላይ ደረሰኝ ለመቁረጥ እነዚህን ቁጥሮች ይጠቀሙ፦</p>
     </div>
 
@@ -2259,7 +2327,8 @@ const I18N = {
     nav_kitchen: 'ኪችን (ታብሌት 1)',
     nav_barista: 'ባሬስታ (ታብሌት 2)',
     nav_cashier: 'ካሸር POS & ጠረጴዛዎች (ታብሌት 3)',
-    table_label: 'የጠረጴዛ ቁጥርዎን ያስገቡ:',
+    table_label: 'ጠረጴዛ ቁጥር:',
+    guest_count_label: 'የሰው ብዛት:',
     call_waiter: 'አስተናጋጅ ጥራ',
     house_special_btn: 'የዛሬ ልዩ',
     house_special_badge: 'የዛሬው ልዩ ምግብ (TODAY\'S SPECIAL)',
@@ -2325,7 +2394,8 @@ const I18N = {
     nav_kitchen: 'Kitchen (Tablet 1)',
     nav_barista: 'Barista (Tablet 2)',
     nav_cashier: 'Cashier POS & Tables (Tablet 3)',
-    table_label: 'Enter Your Table No:',
+    table_label: 'Table No:',
+    guest_count_label: 'Guests:',
     call_waiter: 'Call Waiter',
     house_special_btn: 'Today\'s Special',
     house_special_badge: 'TODAY\'S HOUSE SPECIAL',
