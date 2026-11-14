@@ -260,24 +260,28 @@
           <h2 class="text-xl sm:text-2xl font-extrabold text-emerald-950 flex items-center gap-2">
             🍳 <span data-i18n="kitchen_title">የኪችን ትዕዛዝ መቀበያ (Tablet 1 - Food)</span>
           </h2>
-          <p class="text-xs sm:text-sm text-teal-700" data-i18n="kitchen_sub">ምግቦች ሲዘጋጁ እያንዳንዱን ለየብቻ "ደርሷል" ይበሉ፤ ሲያልቁ ወደ ታሪክ ማህደር ይገባሉ</p>
+          <p class="text-xs sm:text-sm text-teal-700" data-i18n="kitchen_sub">የ24 ሰዓት ንቁ ዝርዝር — ምግቦች ሲዘጋጁ "ደርሷል" ይበሉ፤ የቀኑን ሙሉ መረጃ በ Word ያውርዱ</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <div class="bg-white border border-teal-200 p-1 rounded-xl flex gap-1 shadow-sm">
-            <button onclick="setStationSubView('kitchen', 'active')" id="btn-kitchen-active" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-teal-700 text-white transition">
+          <div class="bg-white border border-teal-200 p-1 rounded-xl flex flex-wrap gap-1 shadow-sm">
+            <button onclick="setStationSubView('kitchen', 'active')" id="btn-kitchen-active" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-teal-700 text-white transition">
               🔥 <span data-i18n="station_active_btn">በመዘጋጀት ላይ ያሉ</span> (<span id="count-kitchen-active">0</span>)
             </button>
-            <button onclick="setStationSubView('kitchen', 'served')" id="btn-kitchen-served" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition">
-              ✅ <span data-i18n="station_served_btn">ዛሬ የተስተናገዱ ኦርደሮች</span> (<span id="count-kitchen-served">0</span>)
+            <button onclick="setStationSubView('kitchen', 'served')" id="btn-kitchen-served" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition">
+              ✅ <span data-i18n="station_served_btn">ዛሬ የተጠናቀቁ ኦርደሮች</span> (<span id="count-kitchen-served">0</span>)
+            </button>
+            <button onclick="setStationSubView('kitchen', 'summary')" id="btn-kitchen-summary" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition">
+              📊 <span data-i18n="station_summary_btn">የዛሬ መረጃ</span>
             </button>
           </div>
-          <button onclick="acknowledgeAllStation('kitchen')" class="bg-emerald-950 hover:bg-emerald-900 text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl shadow transition">
+          <button onclick="acknowledgeAllStation('kitchen')" class="bg-emerald-950 hover:bg-emerald-900 text-white text-xs sm:text-sm font-bold px-3.5 py-2.5 rounded-xl shadow transition">
             ✓ <span data-i18n="ack_all">ሁሉንም አይቻለሁ</span>
           </button>
         </div>
       </div>
 
       <div id="kitchen-orders-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      <div id="kitchen-summary-panel" class="hidden"></div>
     </section>
 
     <!-- ==================== 3. BARISTA KDS (TABLET 2) ==================== -->
@@ -287,24 +291,28 @@
           <h2 class="text-xl sm:text-2xl font-extrabold text-emerald-950 flex items-center gap-2">
             🍹 <span data-i18n="barista_title">የባሬስታ ትዕዛዝ መቀበያ (Tablet 2 - Drinks)</span>
           </h2>
-          <p class="text-xs sm:text-sm text-teal-700" data-i18n="barista_sub">መጠጦች ሲዘጋጁ እያንዳንዱን ለየብቻ "ደርሷል" ይበሉ፤ ሲያልቁ ወደ ታሪክ ማህደር ይገባሉ</p>
+          <p class="text-xs sm:text-sm text-teal-700" data-i18n="barista_sub">የ24 ሰዓት ንቁ ዝርዝር — መጠጦች ሲዘጋጁ "ደርሷል" ይበሉ፤ የቀኑን ሙሉ መረጃ በ Word ያውርዱ</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <div class="bg-white border border-teal-200 p-1 rounded-xl flex gap-1 shadow-sm">
-            <button onclick="setStationSubView('barista', 'active')" id="btn-barista-active" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-teal-700 text-white transition">
+          <div class="bg-white border border-teal-200 p-1 rounded-xl flex flex-wrap gap-1 shadow-sm">
+            <button onclick="setStationSubView('barista', 'active')" id="btn-barista-active" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-teal-700 text-white transition">
               🔥 <span data-i18n="station_active_btn">በመዘጋጀት ላይ ያሉ</span> (<span id="count-barista-active">0</span>)
             </button>
-            <button onclick="setStationSubView('barista', 'served')" id="btn-barista-served" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition">
-              ✅ <span data-i18n="station_served_btn">ዛሬ የተስተናገዱ ኦርደሮች</span> (<span id="count-barista-served">0</span>)
+            <button onclick="setStationSubView('barista', 'served')" id="btn-barista-served" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition">
+              ✅ <span data-i18n="station_served_btn">ዛሬ የተጠናቀቁ ኦርደሮች</span> (<span id="count-barista-served">0</span>)
+            </button>
+            <button onclick="setStationSubView('barista', 'summary')" id="btn-barista-summary" class="px-3 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition">
+              📊 <span data-i18n="station_summary_btn">የዛሬ መረጃ</span>
             </button>
           </div>
-          <button onclick="acknowledgeAllStation('barista')" class="bg-emerald-950 hover:bg-emerald-900 text-white text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl shadow transition">
+          <button onclick="acknowledgeAllStation('barista')" class="bg-emerald-950 hover:bg-emerald-900 text-white text-xs sm:text-sm font-bold px-3.5 py-2.5 rounded-xl shadow transition">
             ✓ <span data-i18n="ack_all">ሁሉንም አይቻለሁ</span>
           </button>
         </div>
       </div>
 
       <div id="barista-orders-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      <div id="barista-summary-panel" class="hidden"></div>
     </section>
 
     <!-- ==================== 4. CASHIER POS & TABLES (TABLET 3) ==================== -->
@@ -1124,6 +1132,22 @@ function parseCustomerTableInput(rawVal) {
   return num;
 }
 
+// ==================== 24-HOUR LIVE RETENTION & ARCHIVE HELPERS ====================
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+function isWithinLast24Hours(orderOrAlert) {
+  const ts = Number(orderOrAlert.createdTs || orderOrAlert.ts || Date.now());
+  return (Date.now() - ts) <= TWENTY_FOUR_HOURS_MS;
+}
+
+function getLast24HoursOrders() {
+  return (sharedState.orders || []).filter(o => isWithinLast24Hours(o));
+}
+
+function getLast24HoursAlerts() {
+  return (sharedState.alerts || []).filter(a => isWithinLast24Hours(a));
+}
+
 // ==================== 8. ROLE & URL ROUTING ====================
 function initRouting() {
   const params = new URLSearchParams(window.location.search);
@@ -1554,7 +1578,7 @@ function submitCustomerOrder() {
       channel: 'customer',
       text: `➕ ጠረጴዛ #${customerTable}: ተጨማሪ ትዕዛዝ (Add-on) ከቅድሙ ጋር እንዲደመር ቀርቧል!`,
       seen: false,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      ts: Date.now(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
   } else {
     const subtotal = newItems.reduce((sum, i) => sum + i.price * i.qty, 0);
@@ -1586,7 +1610,7 @@ function submitCustomerOrder() {
       channel: 'customer',
       text: `🆕 ${locTitle}${guestTag}: አዲስ ትዕዛዝ (${subtotal + Number(selectedTip)} ETB) ገብቷል!`,
       seen: false,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      ts: Date.now(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
   }
 
@@ -1634,7 +1658,7 @@ function callWaiter() {
     channel: 'customer',
     text: `🔔 ${locText}: ደንበኛው አስተናጋጅ ጠርቷል!`,
     seen: false,
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    ts: Date.now(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
   saveSharedState();
   showToast(currentLang === 'am' ? `${locText} አስተናጋጅ ጠርቷል!` : `Waiter notified for ${locText}!`);
@@ -1717,29 +1741,31 @@ function renderCustomerView() {
   updateFloatingCartBar();
 }
 
-// ==================== 10. KITCHEN & BARISTA KDS WITH "SERVED TODAY" ARCHIVE TAB ====================
+// ==================== 10. KITCHEN & BARISTA KDS WITH 24H RETENTION & "TODAY'S SUMMARY" ====================
 function setStationSubView(station, subView) {
   stationSubViews[station] = subView;
-  const activeBtn = document.getElementById(`btn-${station}-active`);
-  const servedBtn = document.getElementById(`btn-${station}-served`);
-
-  if (subView === 'active') {
-    activeBtn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-teal-700 text-white transition';
-    servedBtn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition';
-  } else {
-    servedBtn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-teal-700 text-white transition';
-    activeBtn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition';
-  }
+  ['active', 'served', 'summary'].forEach(mode => {
+    const btn = document.getElementById(`btn-${station}-${mode}`);
+    if (!btn) return;
+    if (mode === subView) {
+      btn.className = 'px-3 py-2 rounded-lg text-xs sm:text-sm font-extrabold bg-teal-700 text-white transition';
+    } else {
+      btn.className = 'px-3 py-2 rounded-lg text-xs sm:text-sm font-extrabold text-teal-900 hover:bg-teal-50 transition';
+    }
+  });
   renderStationKDS(station);
 }
 
 function renderStationKDS(station) {
   const catFilter = station === 'kitchen' ? 'food' : 'drink';
   const grid = document.getElementById(`${station}-orders-grid`);
+  const summaryPanel = document.getElementById(`${station}-summary-panel`);
   const seenKey = station === 'kitchen' ? 'seenKitchen' : 'seenBarista';
   const currentSub = stationSubViews[station] || 'active';
 
-  const stationOrders = sharedState.orders.filter(o => o.items.some(i => i.cat === catFilter));
+  // Strictly scoped to Last 24 Hours for live station screens
+  const recent24hOrders = getLast24HoursOrders();
+  const stationOrders = recent24hOrders.filter(o => o.items.some(i => i.cat === catFilter));
 
   const activeStationOrders = stationOrders.filter(o =>
     o.status !== 'paid' && o.items.filter(i => i.cat === catFilter).some(i => !i.ready)
@@ -1762,12 +1788,23 @@ function renderStationKDS(station) {
     badge.classList.add('hidden');
   }
 
+  // Handle 3rd Tab: "የዛሬ መረጃ (Today's Summary & Word Download)"
+  if (currentSub === 'summary') {
+    grid.classList.add('hidden');
+    summaryPanel.classList.remove('hidden');
+    renderStationSummaryPanel(station, stationOrders, servedStationOrders, activeStationOrders, catFilter);
+    return;
+  }
+
+  grid.classList.remove('hidden');
+  summaryPanel.classList.add('hidden');
+
   const listToRender = currentSub === 'active' ? activeStationOrders : servedStationOrders;
 
   if (listToRender.length === 0) {
     const emptyMsg = currentSub === 'active'
-      ? (currentLang === 'am' ? 'በመዘጋጀት ላይ ያለ አዲስ ትዕዛዝ የለም' : 'No pending orders in active queue')
-      : (currentLang === 'am' ? 'ዛሬ ተዘጋጅተው የተላኩ ኦርደሮች እዚህ ይቀመጣሉ' : 'No served orders archived yet today');
+      ? (currentLang === 'am' ? 'በመዘጋጀት ላይ ያለ አዲስ ትዕዛዝ የለም (24 ሰዓት)' : 'No pending orders in active queue (24h)')
+      : (currentLang === 'am' ? 'ባለፉት 24 ሰዓታት ተዘጋጅተው የተጠናቀቁ ኦርደሮች እዚህ ይቀመጣሉ' : 'No completed orders archived in the last 24 hours');
     grid.innerHTML = `<div class="col-span-full bg-white rounded-2xl p-10 text-center border border-teal-100 text-teal-700 font-bold">${emptyMsg}</div>`;
     return;
   }
@@ -1784,7 +1821,7 @@ function renderStationKDS(station) {
               <div class="flex items-center gap-2">
                 <span class="text-base font-extrabold text-emerald-950">${order.table === 'Takeaway' ? '🛍️ Takeaway' : '🪑 ጠረጴዛ #' + order.table}</span>
                 ${isNew ? '<span class="bg-red-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-md">አዲስ / NEW</span>' : ''}
-                ${currentSub === 'served' ? `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md">✓ ${currentLang === 'am' ? 'ተስተናግዷል' : 'Served'}</span>` : ''}
+                ${currentSub === 'served' ? `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md">✓ ${currentLang === 'am' ? 'ተጠናቋል' : 'Completed'}</span>` : ''}
               </div>
               <p class="text-[11px] text-teal-600 font-semibold">${order.id} • ${order.createdAt} (${order.source})</p>
             </div>
@@ -1812,6 +1849,180 @@ function renderStationKDS(station) {
       </div>
     `;
   }).join('');
+}
+
+function renderStationSummaryPanel(station, allStationOrders, completedOrders, pendingOrders, catFilter) {
+  const panel = document.getElementById(`${station}-summary-panel`);
+  const stationTitleAm = station === 'kitchen' ? 'የኪችን (Kitchen)' : 'የባሬስታ (Barista)';
+  const stationTitleEn = station === 'kitchen' ? 'Kitchen' : 'Barista';
+  const unitLabelAm = station === 'kitchen' ? 'የምግብ መጠን (Plates/Items)' : 'የመጠጥ መጠን (Cups/Drinks)';
+  const unitLabelEn = station === 'kitchen' ? 'Total Food Portions' : 'Total Drinks Prepared';
+
+  let totalPreparedUnits = 0;
+  let totalPendingUnits = 0;
+  let totalStationValue = 0;
+  const itemBreakdown = {};
+
+  allStationOrders.forEach(o => {
+    o.items.filter(i => i.cat === catFilter).forEach(i => {
+      const q = Number(i.qty || 1);
+      const key = currentLang === 'am' ? i.am : i.en;
+      if (!itemBreakdown[key]) itemBreakdown[key] = { ready: 0, pending: 0, total: 0, revenue: 0 };
+      itemBreakdown[key].total += q;
+      if (i.ready) {
+        totalPreparedUnits += q;
+        totalStationValue += Number(i.price) * q;
+        itemBreakdown[key].ready += q;
+        itemBreakdown[key].revenue += Number(i.price) * q;
+      } else {
+        totalPendingUnits += q;
+        itemBreakdown[key].pending += q;
+      }
+    });
+  });
+
+  const sortedItems = Object.entries(itemBreakdown).sort((a, b) => b[1].total - a[1].total);
+
+  panel.innerHTML = `
+    <div class="bg-white rounded-2xl p-5 sm:p-6 border border-teal-200 shadow-sm space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-teal-100 pb-4">
+        <div>
+          <h3 class="text-lg sm:text-xl font-extrabold text-emerald-950">
+            📊 ${currentLang === 'am' ? `${stationTitleAm} የዛሬ ሙሉ የሥራ መረጃ (24 ሰዓት)` : `${stationTitleEn} Today's Production Summary (24h)`}
+          </h3>
+          <p class="text-xs text-teal-700 mt-0.5">
+            ${currentLang === 'am'
+              ? 'ይህ መረጃ ለ24 ሰዓት ይቆያል፤ ለማህደር እንዲቀመጥ በ Word (.doc) ማውረድ ይችላሉ'
+              : 'Live display retains 24 hours of activity; download as Word (.doc) to archive'}
+          </p>
+        </div>
+        <button onclick="downloadStationWordReport('${station}')" class="brand-gradient hover:opacity-95 text-white font-extrabold text-xs sm:text-sm px-5 py-3 rounded-xl shadow-md transition flex items-center gap-2">
+          📄 <span>${currentLang === 'am' ? `${stationTitleAm} ሪፖርት በ Word (.doc) አውርድ` : `Download ${stationTitleEn} Word Report`}</span>
+        </button>
+      </div>
+
+      <!-- 4 Key KPI Cards for Kitchen / Barista -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-teal-50/70 p-4 rounded-2xl border border-teal-200">
+          <p class="text-xs font-bold text-teal-800">${currentLang === 'am' ? 'ጠቅላላ የመጡ ትዕዛዞች' : 'Total Orders Received'}</p>
+          <p class="text-2xl font-extrabold text-emerald-950 mt-1">${allStationOrders.length}</p>
+        </div>
+        <div class="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-200">
+          <p class="text-xs font-bold text-emerald-800">${currentLang === 'am' ? 'ተዘጋጅተው የተጠናቀቁ' : 'Completed Orders'}</p>
+          <p class="text-2xl font-extrabold text-emerald-700 mt-1">${completedOrders.length}</p>
+        </div>
+        <div class="bg-amber-50/80 p-4 rounded-2xl border border-amber-200">
+          <p class="text-xs font-bold text-amber-900">${currentLang === 'am' ? unitLabelAm : unitLabelEn}</p>
+          <p class="text-2xl font-extrabold text-amber-800 mt-1">${totalPreparedUnits} <span class="text-xs font-semibold">(${currentLang === 'am' ? 'ቀሪ' : 'pending'}: ${totalPendingUnits})</span></p>
+        </div>
+        <div class="bg-teal-900 text-white p-4 rounded-2xl shadow-sm">
+          <p class="text-xs font-bold text-teal-200">${currentLang === 'am' ? 'የተዘጋጁ ትዕዛዞች ዋጋ ግምት' : 'Prepared Value'}</p>
+          <p class="text-2xl font-extrabold text-white mt-1">${totalStationValue} ETB</p>
+        </div>
+      </div>
+
+      <!-- Item-by-Item Daily Output Table -->
+      <div>
+        <h4 class="text-sm font-extrabold text-emerald-950 mb-3">
+          ${currentLang === 'am' ? '📋 በቀኑ ውስጥ የተዘጋጁ ዝርዝር መጠን (Item Breakdown)' : '📋 Item-by-Item Output Breakdown (Last 24h)'}
+        </h4>
+        ${sortedItems.length === 0
+          ? `<p class="text-xs text-gray-500 bg-gray-50 p-4 rounded-xl text-center">${currentLang === 'am' ? 'ባለፉት 24 ሰዓታት የተመዘገበ ትዕዛዝ የለም' : 'No orders recorded in the last 24 hours'}</p>`
+          : `<div class="overflow-x-auto border border-teal-100 rounded-xl">
+               <table class="w-full text-left text-xs sm:text-sm">
+                 <thead class="bg-teal-900 text-white">
+                   <tr>
+                     <th class="p-3">#</th>
+                     <th class="p-3">${currentLang === 'am' ? 'ዓይነት' : 'Item Name'}</th>
+                     <th class="p-3">${currentLang === 'am' ? 'የተጠናቀቀ (Ready)' : 'Completed'}</th>
+                     <th class="p-3">${currentLang === 'am' ? 'በሂደት ላይ' : 'Pending'}</th>
+                     <th class="p-3">${currentLang === 'am' ? 'ጠቅላላ ብዛት' : 'Total Qty'}</th>
+                   </tr>
+                 </thead>
+                 <tbody class="divide-y divide-teal-100">
+                   ${sortedItems.map(([name, info], idx) => `
+                     <tr class="hover:bg-teal-50/40">
+                       <td class="p-3 font-bold">${idx + 1}</td>
+                       <td class="p-3 font-extrabold text-emerald-950">${name}</td>
+                       <td class="p-3 font-bold text-emerald-700">${info.ready}</td>
+                       <td class="p-3 font-bold text-amber-700">${info.pending}</td>
+                       <td class="p-3 font-extrabold text-teal-900">${info.total}</td>
+                     </tr>
+                   `).join('')}
+                 </tbody>
+               </table>
+             </div>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function downloadStationWordReport(station) {
+  const catFilter = station === 'kitchen' ? 'food' : 'drink';
+  const stationTitleAm = station === 'kitchen' ? 'የኪችን (Kitchen)' : 'የባሬስታ (Barista)';
+  const stationTitleEn = station === 'kitchen' ? 'Kitchen' : 'Barista';
+
+  const recent24hOrders = getLast24HoursOrders().filter(o => o.items.some(i => i.cat === catFilter));
+  let totalPrepared = 0;
+  let totalValue = 0;
+  const itemCounts = {};
+
+  recent24hOrders.forEach(o => {
+    o.items.filter(i => i.cat === catFilter).forEach(i => {
+      const q = Number(i.qty || 1);
+      if (!itemCounts[i.am]) itemCounts[i.am] = { ready: 0, total: 0, val: 0 };
+      itemCounts[i.am].total += q;
+      if (i.ready) {
+        totalPrepared += q;
+        totalValue += Number(i.price) * q;
+        itemCounts[i.am].ready += q;
+        itemCounts[i.am].val += Number(i.price) * q;
+      }
+    });
+  });
+
+  const itemRows = Object.entries(itemCounts).sort((a, b) => b[1].total - a[1].total)
+    .map(([name, d], idx) => `<tr><td>${idx + 1}</td><td>${name}</td><td>${d.ready}</td><td>${d.total}</td><td>${d.val} ETB</td></tr>`).join('');
+
+  const orderRows = recent24hOrders.map(o => {
+    const stItems = o.items.filter(i => i.cat === catFilter).map(i => `${i.qty}x ${i.am} (${i.ready ? 'ደርሷል' : 'በሂደት'})`).join(', ');
+    return `<tr><td>${o.id}</td><td>${o.table}</td><td>${o.createdAt}</td><td>${stItems}</td></tr>`;
+  }).join('');
+
+  const docHtml = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head><meta charset='utf-8'><title>${stationTitleEn} 24h Report</title></head>
+    <body style="font-family: Arial, sans-serif;">
+      <h1 style="color:#064E3B;">SMART CAFE - ${stationTitleAm} የዕለቱ መረጃ (24-Hour Report)</h1>
+      <p>ቀን: ${new Date().toLocaleDateString()} | ሰዓት: ${new Date().toLocaleTimeString()}</p>
+      <h3>1. የሥራ ማጠቃለያ (24-Hour Summary)</h3>
+      <ul>
+        <li><strong>ጠቅላላ የመጡ ትዕዛዞች ብዛት:</strong> ${recent24hOrders.length}</li>
+        <li><strong>ተዘጋጅተው የወጡ ጠቅላላ ብዛት (Prepared Units):</strong> ${totalPrepared}</li>
+        <li><strong>የተዘጋጁ ትዕዛዞች ጠቅላላ ዋጋ:</strong> ${totalValue} ETB</li>
+      </ul>
+      <h3>2. በዓይነት የተዘጋጁ ዝርዝር (Item Breakdown)</h3>
+      <table border="1" cellpadding="6" cellspacing="0" width="100%">
+        <tr style="background:#0D9488; color:white;"><th>#</th><th>የምግብ/መጠጥ ስም</th><th>የተጠናቀቀ</th><th>ጠቅላላ</th><th>ዋጋ</th></tr>
+        ${itemRows || '<tr><td colspan="5">ምንም መረጃ የለም</td></tr>'}
+      </table>
+      <h3>3. የትዕዛዞች ዝርዝር (Orders Log - Last 24h)</h3>
+      <table border="1" cellpadding="6" cellspacing="0" width="100%">
+        <tr style="background:#064E3B; color:white;"><th>መለያ</th><th>ጠረጴዛ</th><th>ሰዓት</th><th>ዝርዝር</th></tr>
+        ${orderRows || '<tr><td colspan="4">ምንም ትዕዛዝ የለም</td></tr>'}
+      </table>
+    </body></html>
+  `;
+
+  const blob = new Blob(['\ufeff', docHtml], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Smart_Cafe_${stationTitleEn}_24h_Report_${new Date().toISOString().slice(0, 10)}.doc`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`${stationTitleAm} የዛሬ መረጃ በ Word (.doc) ወርዷል!`);
 }
 
 function acknowledgeOrder(orderId, station) {
@@ -1845,7 +2056,7 @@ function markItemReady(orderId, itemUid, station) {
       channel: station,
       text: `✅ ${order.table === 'Takeaway' ? '🛍️ Takeaway' : 'ጠረጴዛ #' + order.table}: ${item.qty}x ${item.am} (${stationName}) ተዘጋጅቷል!`,
       seen: false,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      ts: Date.now(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
     saveSharedState();
   }
@@ -1966,11 +2177,15 @@ function classifyAlertChannel(alertObj) {
 }
 
 function renderCashierView() {
-  const paidOrders = sharedState.orders.filter(o => o.status === 'paid');
+  // Live Cashier screen displays the last 24 hours; older records stay archived for Multi-Period Word Reports
+  const orders24h = getLast24HoursOrders();
+  const alerts24h = getLast24HoursAlerts();
+
+  const paidOrders = orders24h.filter(o => o.status === 'paid');
   const totalRev = paidOrders.reduce((s, o) => s + Number(o.total || 0), 0);
-  const qrRev = paidOrders.filter(o => o.source === 'QR Scan').reduce((s, o) => s + Number(o.total || 0), 0);
-  const walkinRev = paidOrders.filter(o => o.source !== 'QR Scan').reduce((s, o) => s + Number(o.total || 0), 0);
-  const activeOrders = sharedState.orders.filter(o => o.status !== 'paid');
+  const qrRev = paidOrders.filter(o => o.source === 'QR Scan' || o.source === 'QR Takeaway').reduce((s, o) => s + Number(o.total || 0), 0);
+  const walkinRev = paidOrders.filter(o => o.source === 'Walk-in POS').reduce((s, o) => s + Number(o.total || 0), 0);
+  const activeOrders = orders24h.filter(o => o.status !== 'paid');
 
   document.getElementById('stat-revenue').textContent = `${totalRev} ETB`;
   document.getElementById('stat-split-source').textContent = `QR: ${qrRev} ETB | Walk-in: ${walkinRev} ETB`;
@@ -1978,11 +2193,11 @@ function renderCashierView() {
 
   renderCashierStockManager();
 
-  const customerAlerts = sharedState.alerts.filter(a => classifyAlertChannel(a) === 'customer');
-  const kitchenAlerts = sharedState.alerts.filter(a => classifyAlertChannel(a) === 'kitchen');
-  const baristaAlerts = sharedState.alerts.filter(a => classifyAlertChannel(a) === 'barista');
+  const customerAlerts = alerts24h.filter(a => classifyAlertChannel(a) === 'customer');
+  const kitchenAlerts = alerts24h.filter(a => classifyAlertChannel(a) === 'kitchen');
+  const baristaAlerts = alerts24h.filter(a => classifyAlertChannel(a) === 'barista');
 
-  const unseenTotal = sharedState.alerts.filter(a => !a.seen).length;
+  const unseenTotal = alerts24h.filter(a => !a.seen).length;
   const badgeCashier = document.getElementById('badge-cashier');
   if (unseenTotal > 0) {
     badgeCashier.textContent = unseenTotal;
@@ -2034,10 +2249,10 @@ function renderCashierView() {
   renderCashierInlinePOS();
 
   const logEl = document.getElementById('cashier-orders-log');
-  if (sharedState.orders.length === 0) {
-    logEl.innerHTML = `<p class="text-xs text-gray-500">እስካሁን ትዕዛዝ አልተመዘገበም</p>`;
+  if (orders24h.length === 0) {
+    logEl.innerHTML = `<p class="text-xs text-gray-500">ባለፉት 24 ሰዓታት ትዕዛዝ አልተመዘገበም</p>`;
   } else {
-    logEl.innerHTML = sharedState.orders.map(o => {
+    logEl.innerHTML = orders24h.map(o => {
       const totals = calculateOrderTotals(o);
       return `
         <div class="p-3 rounded-xl border border-teal-100 bg-teal-50/40 flex flex-wrap items-center justify-between gap-2">
@@ -2060,7 +2275,7 @@ function renderCashierView() {
   }
 
   const counts = {};
-  sharedState.orders.forEach(o => {
+  orders24h.forEach(o => {
     o.items.forEach(i => {
       counts[i.am] = (counts[i.am] || 0) + Number(i.qty);
     });
@@ -2367,7 +2582,8 @@ const I18N = {
     barista_title: 'የባሬስታ ትዕዛዝ መቀበያ (Tablet 2 - Drinks)',
     barista_sub: 'መጠጦች ሲዘጋጁ እያንዳንዱን ለየብቻ "ደርሷል" ይበሉ፤ ሲያልቁ ወደ ታሪክ ማህደር ይገባሉ',
     station_active_btn: 'በመዘጋጀት ላይ ያሉ',
-    station_served_btn: 'ዛሬ የተስተናገዱ ኦርደሮች',
+    station_served_btn: 'ዛሬ የተጠናቀቁ ኦርደሮች',
+    station_summary_btn: 'የዛሬ መረጃ',
     ack_all: 'ሁሉንም አይቻለሁ',
     open_report_modal: 'የሽያጭ ሪፖርት አውርድ (Report)',
     cashier_alerts_title: 'የካሸር መልዕክቶች (በ3 ክፍል የተለዩ)',
@@ -2434,7 +2650,8 @@ const I18N = {
     barista_title: 'Barista Display System (Tablet 2 - Drinks)',
     barista_sub: 'Mark drinks ready individually; completed orders move to Served Today',
     station_active_btn: 'Active Queue',
-    station_served_btn: 'Served Orders Today',
+    station_served_btn: 'Completed Orders Today',
+    station_summary_btn: 'Today\'s Summary',
     ack_all: 'Acknowledge All',
     open_report_modal: 'Download Sales Report',
     cashier_alerts_title: 'Cashier Notifications (3 Separate Channels)',
