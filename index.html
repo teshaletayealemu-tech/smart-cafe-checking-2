@@ -322,12 +322,12 @@
         </div>
       </div>
 
-      <!-- CASHIER CONTROL FOR TODAY'S HOUSE SPECIAL -->
+      <!-- CASHIER CONTROL FOR TODAY\'S HOUSE SPECIAL -->
       <div class="bg-white rounded-2xl p-4 sm:p-5 border-2 border-amber-300 shadow-sm mb-6">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-100 pb-3 mb-4">
           <div>
             <h3 class="text-base sm:text-lg font-extrabold text-emerald-950 flex items-center gap-2">
-              ⭐ <span data-i18n="cashier_special_title">የዕለቱ ልዩ ምግብ መቆጣጠሪያ (Today's House Special Manager)</span>
+              ⭐ <span data-i18n="cashier_special_title">የዕለቱ ልዩ ምግብ መቆጣጠሪያ (Today\'s House Special Manager)</span>
             </h3>
             <p class="text-xs text-teal-700" data-i18n="cashier_special_sub">ደንበኛው QR Code ስካን ሲያደርግ የሚታየውን የዕለቱን ልዩ ምግብ እና ዋጋውን እዚህ ይወስኑ</p>
           </div>
@@ -600,12 +600,12 @@
     </div>
   </div>
 
-  <!-- 5. TODAY'S HOUSE SPECIAL POPUP -->
+  <!-- 5. TODAY\'S HOUSE SPECIAL POPUP -->
   <div id="modal-special" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border-2 border-amber-400">
       <div class="relative h-52 bg-emerald-900">
         <img id="special-modal-img" src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80" alt="Special" class="w-full h-full object-cover opacity-95" />
-        <span class="absolute top-3 left-3 bg-amber-500 text-white text-xs font-extrabold px-3 py-1 rounded-lg shadow">⭐ <span data-i18n="house_special_badge">የዛሬው ልዩ ምግብ (TODAY'S SPECIAL)</span></span>
+        <span class="absolute top-3 left-3 bg-amber-500 text-white text-xs font-extrabold px-3 py-1 rounded-lg shadow">⭐ <span data-i18n="house_special_badge">የዛሬው ልዩ ምግብ (TODAY\'S SPECIAL)</span></span>
         <button onclick="dismissSpecialPopup()" class="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white w-8 h-8 rounded-lg font-bold">✕</button>
       </div>
       <div class="p-5 text-center space-y-3">
@@ -874,7 +874,7 @@ function handleIncomingState(data) {
   populateCashierSpecialForm();
   renderAllViews();
 
-  // Auto-open Today's Special popup once when Customer scans QR (only if special is active & not hidden)
+  // Auto-open Today\'s Special popup once when Customer scans QR (only if special is active & not hidden)
   const sp = sharedState.houseSpecial;
   if (!hasShownInitialSpecial && currentTab === 'customer' && sp.active && !isItemHidden(sp.itemId)) {
     const activeOrd = getActiveTableOrder(customerTable);
@@ -1005,7 +1005,7 @@ function renderCashierStockManager() {
   }).join('');
 }
 
-// ==================== 7. TODAY'S SPECIAL POPUP & CASHIER MANAGER ====================
+// ==================== 7. TODAY\'S SPECIAL POPUP & CASHIER MANAGER ====================
 function initCashierSpecialDropdown() {
   const sel = document.getElementById('special-item-select');
   if (!sel) return;
@@ -1069,7 +1069,7 @@ function openSpecialPopup(manualClick = false) {
   const sp = sharedState.houseSpecial || DEFAULT_HOUSE_SPECIAL;
   if ((!sp.active || isItemHidden(sp.itemId)) && !manualClick) return;
   if (isItemHidden(sp.itemId) && manualClick) {
-    showToast(currentLang === 'am' ? 'የዛሬው ልዩ ምግብ በአሁኑ ሰዓት አልቋል!' : 'Today's special is currently out of stock!');
+    showToast(currentLang === 'am' ? 'የዛሬው ልዩ ምግብ በአሁኑ ሰዓት አልቋል!' : 'Today\'s special is currently out of stock!');
     return;
   }
 
