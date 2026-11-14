@@ -1,0 +1,2179 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Cafe - Real-Time Ordering System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#064e3b',
+                            900: '#022c22'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase Compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f2fbf8;
+            color: #1e293b;
+        }
+        .pulse-border {
+            animation: pulse-border-anim 1.5s infinite;
+        }
+        @keyframes pulse-border-anim {
+            0% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(13, 148, 136, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0); }
+        }
+        .flash-new {
+            animation: flash-bg 1s infinite alternate;
+        }
+        @keyframes flash-bg {
+            from { background-color: #fef2f2; border-color: #ef4444; }
+            to { background-color: #ecfdf5; border-color: #10b981; }
+        }
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e2e8f0;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0d9488;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-white">
+
+    <!-- TOP CATERING ANNOUNCEMENT BANNER -->
+    <div id="catering-banner" class="bg-gradient-to-r from-brand-900 via-brand-700 to-brand-900 text-amber-300 py-2 px-4 text-center text-xs md:text-sm font-medium tracking-wide shadow-md flex items-center justify-between">
+        <div class="flex-1 flex items-center justify-center space-x-2 space-x-reverse">
+            <span class="animate-bounce">🎉</span>
+            <span id="txt-catering-banner">ልዩ የሠርግ፣ የስብሰባ እና የሙሉ ኬተሪንግ አገልግሎት እንሰጣለን! | 📞 0911-23-45-67</span>
+        </div>
+        <button onclick="document.getElementById('catering-banner').style.display='none'" class="text-amber-300 hover:text-white ml-2">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <!-- MAIN NAVBAR HEADER -->
+    <header class="bg-gradient-to-r from-brand-900 via-brand-800 to-brand-700 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+            
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 to-amber-200 text-brand-900 flex items-center justify-center font-black text-xl shadow">
+                    ☕
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                        Smart Cafe
+                        <span id="role-badge" class="text-xs bg-amber-400 text-brand-900 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">All Roles</span>
+                    </h1>
+                    <p class="text-xs text-emerald-200 flex items-center gap-1">
+                        <span id="table-indicator">ከስካን ጋር የተገናኘ</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Header Controls: Status Badge, Language Switcher, Role Links -->
+            <div class="flex items-center space-x-3 space-x-reverse flex-wrap gap-2">
+                <!-- Sync Status Badge -->
+                <div id="sync-status" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="sync-text">🟢 Live Cloud Sync</span>
+                </div>
+
+                <!-- Amharic / English Language Pill -->
+                <button onclick="toggleLanguage()" class="bg-brand-900/80 hover:bg-brand-900 text-amber-300 border border-amber-400/40 px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-globe"></i>
+                    <span id="lang-btn-text">አማርኛ | English</span>
+                </button>
+
+                <!-- Role Links Modal Trigger (Admin only view) -->
+                <button id="role-links-btn" onclick="openRoleModal()" class="bg-amber-400 hover:bg-amber-300 text-brand-900 px-3 py-1 rounded-full text-xs font-bold transition shadow flex items-center gap-1">
+                    <i class="fa-solid fa-link"></i>
+                    <span id="txt-role-links-btn">የስክሪን ሊንኮች</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ROLE NAVIGATION TABS (Visible only if no strict ?role= set in URL) -->
+        <div id="role-nav-tabs" class="bg-brand-900/90 border-t border-brand-700/50 px-4">
+            <div class="max-w-7xl mx-auto flex space-x-2 space-x-reverse overflow-x-auto py-2 text-xs font-semibold">
+                <button onclick="switchTab('customer')" id="tab-btn-customer" class="tab-btn px-4 py-1.5 rounded-lg bg-emerald-500 text-white font-bold shadow flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-utensils"></i> <span id="txt-tab-customer">የደንበኛ ማዘዣ (QR Menu)</span>
+                </button>
+                <button onclick="switchTab('kitchen')" id="tab-btn-kitchen" class="tab-btn px-4 py-1.5 rounded-lg bg-brand-800 text-emerald-200 hover:bg-brand-700 flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-fire"></i> <span id="txt-tab-kitchen">ማብሰያ ቤት (Kitchen KDS)</span>
+                </button>
+                <button onclick="switchTab('barista')" id="tab-btn-barista" class="tab-btn px-4 py-1.5 rounded-lg bg-brand-800 text-emerald-200 hover:bg-brand-700 flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-mug-hot"></i> <span id="txt-tab-barista">ባሪስታ / መጠጥ (Barista KDS)</span>
+                </button>
+                <button onclick="switchTab('cashier')" id="tab-btn-cashier" class="tab-btn px-4 py-1.5 rounded-lg bg-brand-800 text-emerald-200 hover:bg-brand-700 flex items-center gap-1.5 whitespace-nowrap">
+                    <i class="fa-solid fa-cash-register"></i> <span id="txt-tab-cashier">ካሸር / POS & EOD</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN DYNAMIC CONTENT CONTAINER -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+        <!-- ========================================== -->
+        <!-- VIEW 1: CUSTOMER MENU & BILL (TABLE X)      -->
+        <!-- ========================================== -->
+        <section id="view-customer" class="space-y-6">
+
+            <!-- CUSTOMER LOCK BANNER (If Active Order Exists) -->
+            <div id="customer-lock-notice" class="hidden bg-amber-500 text-brand-900 p-4 rounded-2xl shadow-lg font-bold flex flex-col md:flex-row items-center justify-between gap-3 border-2 border-amber-300">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-lock text-2xl animate-pulse"></i>
+                    <div>
+                        <h4 id="txt-lock-title" class="text-base font-extrabold">ትዕዛዝዎ በዝግጅት ላይ ነው! / Your Order is Active!</h4>
+                        <p id="txt-lock-desc" class="text-xs text-brand-950">ስክሪኑ እስከሚከፈል ድረስ ተቆልፏል። ተጨማሪ ማዘዝ ከፈለጉ 'ተጨማሪ ጨምር' የሚለውን ይጫኑ።</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="customerAddMoreItems()" class="bg-brand-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand-800 transition shadow">
+                        <i class="fa-solid fa-plus"></i> <span id="txt-btn-add-more">ተጨማሪ ትዕዛዝ ጨምር</span>
+                    </button>
+                    <button onclick="scrollToBill()" class="bg-white text-brand-950 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-100 transition shadow">
+                        <i class="fa-solid fa-receipt"></i> <span id="txt-btn-view-bill">ሂሳብ ተመልከት</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- PENDING ADD-ON WAIT LOCK BANNER -->
+            <div id="customer-addon-pending-notice" class="hidden bg-purple-600 text-white p-4 rounded-2xl shadow-lg font-bold flex items-center justify-between gap-3 border-2 border-purple-300 animate-pulse">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-hourglass-half text-2xl"></i>
+                    <div>
+                        <h4 id="txt-addon-wait-title" class="text-sm font-extrabold">የካሸር ማረጋገጫ በመጠባበቅ ላይ...</h4>
+                        <p id="txt-addon-wait-desc" class="text-xs text-purple-100">ያዘዙት ተጨማሪ ምግብ በካሸሩ ሲረጋገጥ ወደ ማብሰያ ቤት ይላካል!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HEADER BAR FOR TABLE & CALL WAITER -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-black text-brand-900 flex items-center gap-2">
+                        <span id="txt-cust-table-title">ጠረጴዛ</span> <span id="cust-table-num" class="bg-brand-600 text-white px-3 py-0.5 rounded-lg text-base">1</span>
+                    </h2>
+                    <p id="txt-cust-subtitle" class="text-xs text-gray-500">ይመገቡ፣ ይደሰቱ! ትዕዛዝዎን ከታች ከተዘረዘሩት ይምረጡ።</p>
+                </div>
+                
+                <!-- Call Waiter Button -->
+                <button onclick="openWaiterCallModal()" class="bg-gradient-to-r from-red-600 to-rose-500 text-white font-bold px-5 py-2.5 rounded-xl shadow-md hover:brightness-110 transition flex items-center gap-2 text-sm pulse-border">
+                    <i class="fa-solid fa-bell text-yellow-300 animate-bounce"></i>
+                    <span id="txt-btn-call-waiter">🔔 አስተናጋጅ ጥራ / Call Waiter</span>
+                </button>
+            </div>
+
+            <!-- CATEGORY FILTER BUTTONS -->
+            <div class="flex items-center space-x-2 space-x-reverse overflow-x-auto pb-2">
+                <button onclick="filterMenu('all')" class="cat-btn active border px-4 py-2 rounded-xl text-xs font-bold transition bg-brand-600 text-white shadow">
+                    <span id="cat-all">ሁሉም / All</span>
+                </button>
+                <button onclick="filterMenu('food')" class="cat-btn border px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-gray-700 hover:bg-emerald-50">
+                    <span id="cat-food">🍲 ዋና ዋና ምግቦች</span>
+                </button>
+                <button onclick="filterMenu('hot')" class="cat-btn border px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-gray-700 hover:bg-emerald-50">
+                    <span id="cat-hot">☕ ሙቅ መጠጦች</span>
+                </button>
+                <button onclick="filterMenu('juice')" class="cat-btn border px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-gray-700 hover:bg-emerald-50">
+                    <span id="cat-juice">🧃 ተፈጥሯዊ ጁሶች</span>
+                </button>
+                <button onclick="filterMenu('soft')" class="cat-btn border px-4 py-2 rounded-xl text-xs font-bold transition bg-white text-gray-700 hover:bg-emerald-50">
+                    <span id="cat-soft">🥤 ቀዝቃዛ መጠጦች</span>
+                </button>
+            </div>
+
+            <!-- MENU GRID & CART SECTION -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                <!-- MENU ITEMS LIST (2 COLS) -->
+                <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4" id="menu-grid">
+                    <!-- Populated dynamically via JS -->
+                </div>
+
+                <!-- CART & ACTIVE BILL PANEL (1 COL) -->
+                <div class="space-y-6">
+                    
+                    <!-- CART CARD -->
+                    <div id="cart-card" class="bg-white p-5 rounded-2xl shadow-md border border-emerald-100 sticky top-24 space-y-4">
+                        <div class="flex items-center justify-between border-b pb-3">
+                            <h3 class="text-base font-extrabold text-brand-900 flex items-center gap-2">
+                                <i class="fa-solid fa-cart-shopping text-brand-600"></i>
+                                <span id="txt-cart-title">የመረጧቸው ምግቦች (Cart)</span>
+                            </h3>
+                            <span id="cart-count-badge" class="bg-brand-100 text-brand-800 text-xs font-bold px-2.5 py-0.5 rounded-full">0</span>
+                        </div>
+
+                        <!-- Cart Items List -->
+                        <div id="cart-items-list" class="space-y-3 max-h-60 overflow-y-auto pr-1">
+                            <p id="txt-cart-empty" class="text-xs text-gray-400 text-center py-6">ምንም አልተመረጠም። ከምናሌው ላይ ይምረጡ።</p>
+                        </div>
+
+                        <!-- Special Note Input -->
+                        <div class="pt-2">
+                            <label id="txt-label-note" class="block text-xs font-semibold text-gray-600 mb-1">ልዩ ማስታወሻ (Special Note):</label>
+                            <input type="text" id="cart-note" placeholder="ለምሳሌ፦ ጨው አታብዛበት / Less salt..." class="w-full text-xs p-2.5 border rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+
+                        <!-- Tip Selector -->
+                        <div>
+                            <label id="txt-label-tip" class="block text-xs font-semibold text-gray-600 mb-1">ጉርሻ / Tip (ETB):</label>
+                            <div class="grid grid-cols-4 gap-1.5 text-xs font-bold">
+                                <button onclick="setTip(0)" class="tip-btn border py-1.5 rounded-lg bg-brand-600 text-white" id="tip-0">0</button>
+                                <button onclick="setTip(20)" class="tip-btn border py-1.5 rounded-lg bg-gray-50 hover:bg-emerald-50" id="tip-20">+20</button>
+                                <button onclick="setTip(50)" class="tip-btn border py-1.5 rounded-lg bg-gray-50 hover:bg-emerald-50" id="tip-50">+50</button>
+                                <button onclick="setTip(100)" class="tip-btn border py-1.5 rounded-lg bg-gray-50 hover:bg-emerald-50" id="tip-100">+100</button>
+                            </div>
+                        </div>
+
+                        <!-- Bill Splitter Calculator -->
+                        <div class="bg-emerald-50/80 p-3.5 rounded-xl space-y-2.5 border border-emerald-200">
+                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                <span id="txt-label-split" class="text-xs font-extrabold text-brand-900">👥 ሂሳብ መክፈያ (Split Bill):</span>
+                                <div class="flex items-center gap-2">
+                                    <!-- Toggle "ሰዎች ጨምር" / "ተጨምሯል ✓" Button -->
+                                    <button type="button" onclick="toggleAddPeople()" id="btn-add-people" class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 shadow-sm bg-brand-600 hover:bg-brand-700 text-white flex items-center gap-1">
+                                        <i class="fa-solid fa-user-plus" id="icon-add-people"></i>
+                                        <span id="txt-btn-add-people">ሰዎች ጨምር</span>
+                                    </button>
+                                    <!-- Inline - / + Stepper Control -->
+                                    <div class="flex items-center bg-white border border-emerald-300 rounded-lg shadow-sm overflow-hidden">
+                                        <button type="button" onclick="changeSplit(-1)" class="w-7 h-7 flex items-center justify-center text-sm font-black text-brand-800 hover:bg-emerald-100 active:bg-emerald-200 transition">-</button>
+                                        <span id="split-count" class="px-2.5 text-xs font-black text-brand-950 select-none">1</span>
+                                        <button type="button" onclick="changeSplit(1)" class="w-7 h-7 flex items-center justify-center text-sm font-black text-brand-800 hover:bg-emerald-100 active:bg-emerald-200 transition">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-xs font-semibold text-gray-700 pt-1 border-t border-emerald-200/70">
+                                <span id="txt-split-per-person">ለአንድ ሰው የሚደርሰው:</span>
+                                <span id="split-amount-val" class="text-brand-700 font-black text-sm">0 ETB</span>
+                            </div>
+                        </div>
+
+                        <!-- Cash Only Warning Badge -->
+                        <div class="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl text-xs flex items-center gap-2 font-medium">
+                            <i class="fa-solid fa-money-bill-wave text-amber-600 text-sm"></i>
+                            <span id="txt-cash-notice">💵 ክፍያ በካሽ ብቻ ይፈጸማል (Cash Payment Only)</span>
+                        </div>
+
+                        <!-- Cart Totals & Submit -->
+                        <div class="border-t pt-3 space-y-2">
+                            <div class="flex justify-between text-xs text-gray-600">
+                                <span id="txt-subtotal">የምግብ ዋጋ:</span>
+                                <span id="cart-subtotal-val" class="font-semibold">0 ETB</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-600">
+                                <span id="txt-tip-amt">ጉርሻ:</span>
+                                <span id="cart-tip-val" class="font-semibold">0 ETB</span>
+                            </div>
+                            <div class="flex justify-between text-base font-extrabold text-brand-900 pt-1 border-t">
+                                <span id="txt-total-bill">ጠቅላላ ሂሳብ:</span>
+                                <span id="cart-total-val" class="text-brand-600">0 ETB</span>
+                            </div>
+
+                            <button id="btn-submit-order" onclick="submitCustomerOrder()" class="w-full bg-gradient-to-r from-brand-600 to-brand-700 text-white font-extrabold py-3 rounded-xl shadow-lg hover:brightness-110 transition text-sm flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                <span id="txt-btn-submit-order">ትዕዛዝ ላክ (Submit Order)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- LIVE ACTIVE BILL TRACKER CARD -->
+                    <div id="active-bill-card" class="bg-white p-5 rounded-2xl shadow-md border border-brand-200 space-y-4">
+                        <div class="flex items-center justify-between border-b pb-3">
+                            <h3 class="text-base font-extrabold text-brand-900 flex items-center gap-2">
+                                <i class="fa-solid fa-receipt text-brand-600"></i>
+                                <span id="txt-active-bill-title">የሂሳብ ማጠቃለያና የትዕዛዝ ሁኔታ</span>
+                            </h3>
+                            <span id="active-bill-status-pill" class="bg-amber-100 text-amber-800 text-xs font-extrabold px-2.5 py-1 rounded-full uppercase">በዝግጅት ላይ</span>
+                        </div>
+
+                        <div id="active-bill-items" class="space-y-2 text-xs">
+                            <p class="text-gray-400 text-center py-4">በዚህ ጠረጴዛ ላይ ገና አላዘዙም።</p>
+                        </div>
+
+                        <div class="border-t pt-3 space-y-1 text-xs">
+                            <div class="flex justify-between font-bold text-gray-700">
+                                <span id="txt-active-subtotal">የምግብ ዋጋ:</span>
+                                <span id="active-bill-subtotal">0 ETB</span>
+                            </div>
+                            <div class="flex justify-between font-bold text-gray-700">
+                                <span id="txt-active-tip">ጉርሻ (Tip):</span>
+                                <span id="active-bill-tip">0 ETB</span>
+                            </div>
+                            <div class="flex justify-between text-base font-black text-brand-900 pt-1 border-t">
+                                <span id="txt-active-total">ጠቅላላ የሚከፈል:</span>
+                                <span id="active-bill-total" class="text-brand-600">0 ETB</span>
+                            </div>
+                        </div>
+
+                        <!-- Active Bill Splitter Control (Available even when screen is locked!) -->
+                        <div class="bg-emerald-50/80 p-3 rounded-xl space-y-2 border border-emerald-200">
+                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                <span id="txt-active-label-split" class="text-xs font-extrabold text-brand-900">👥 ሂሳብ መክፈያ:</span>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" onclick="toggleAddPeople()" id="active-btn-add-people" class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 shadow-sm bg-brand-600 hover:bg-brand-700 text-white flex items-center gap-1">
+                                        <i class="fa-solid fa-user-plus" id="active-icon-add-people"></i>
+                                        <span id="txt-active-btn-add-people">ሰዎች ጨምር</span>
+                                    </button>
+                                    <div class="flex items-center bg-white border border-emerald-300 rounded-lg shadow-sm overflow-hidden">
+                                        <button type="button" onclick="changeSplit(-1)" class="w-7 h-7 flex items-center justify-center text-sm font-black text-brand-800 hover:bg-emerald-100 active:bg-emerald-200 transition">-</button>
+                                        <span id="active-split-count" class="px-2.5 text-xs font-black text-brand-950 select-none">1</span>
+                                        <button type="button" onclick="changeSplit(1)" class="w-7 h-7 flex items-center justify-center text-sm font-black text-brand-800 hover:bg-emerald-100 active:bg-emerald-200 transition">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-xs font-semibold text-gray-700 pt-1 border-t border-emerald-200/70">
+                                <span id="txt-active-split-per-person">ለአንድ ሰው የሚደርሰው:</span>
+                                <span id="active-split-amount-val" class="text-brand-700 font-black text-sm">0 ETB</span>
+                            </div>
+                        </div>
+
+                        <div class="text-center pt-2">
+                            <p id="txt-cashier-paying-hint" class="text-xs text-amber-700 font-semibold">💳 ሂሳብዎን ለመክፈል ለካሸሩ በጥሬ ገንዘብ (Cash) ይክፈሉ።</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 2: KITCHEN KDS (TABLET 1)              -->
+        <!-- ========================================== -->
+        <section id="view-kitchen" class="hidden space-y-6">
+            <div class="bg-gradient-to-r from-red-900 to-brand-900 text-white p-5 rounded-2xl shadow-md flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <h2 class="text-xl font-black flex items-center gap-2">
+                        <i class="fa-solid fa-fire text-amber-400"></i>
+                        <span id="txt-kds-kitchen-title">ማብሰያ ቤት (Kitchen Display System)</span>
+                    </h2>
+                    <p id="txt-kds-kitchen-desc" class="text-xs text-red-200">ዋና ዋና ምግቦችና ፍራፍሬዎች ብቻ የሚታዩበት ስክሪን</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="kitchen-pending-badge" class="bg-amber-400 text-brand-950 px-3 py-1 rounded-full text-xs font-extrabold shadow">0 የሚሰሩ ምግቦች</span>
+                </div>
+            </div>
+
+            <div id="kitchen-orders-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Kitchen orders list dynamic rendering -->
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 3: BARISTA KDS (TABLET 2)              -->
+        <!-- ========================================== -->
+        <section id="view-barista" class="hidden space-y-6">
+            <div class="bg-gradient-to-r from-amber-900 to-brand-900 text-white p-5 rounded-2xl shadow-md flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <h2 class="text-xl font-black flex items-center gap-2">
+                        <i class="fa-solid fa-mug-hot text-amber-300"></i>
+                        <span id="txt-kds-barista-title">ባሪስታ / መጠጥ ቤት (Barista KDS)</span>
+                    </h2>
+                    <p id="txt-kds-barista-desc" class="text-xs text-amber-200">ሙቅ መጠጦች፣ ተፈጥሯዊ ጁሶች እና ቀዝቃዛ መጠጦች ብቻ</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="barista-pending-badge" class="bg-amber-300 text-brand-950 px-3 py-1 rounded-full text-xs font-extrabold shadow">0 የሚሰሩ መጠጦች</span>
+                </div>
+            </div>
+
+            <div id="barista-orders-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Barista orders dynamic rendering -->
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 4: CASHIER POS & EOD REPORT (TABLET 3) -->
+        <!-- ========================================== -->
+        <section id="view-cashier" class="hidden space-y-6">
+            
+            <!-- CASHIER HEADER & TABS -->
+            <div class="bg-white p-5 rounded-2xl shadow-md border border-emerald-100 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-black text-brand-900 flex items-center gap-2">
+                        <i class="fa-solid fa-cash-register text-brand-600"></i>
+                        <span id="txt-cashier-title">ካሸር / ዋና ማስተናገጃ (Cashier POS)</span>
+                    </h2>
+                    <p id="txt-cashier-subtitle" class="text-xs text-gray-500">የጠረጴዛዎች ሁኔታ፣ ክፍያዎች፣ የካሽ አሰባሰብና የዕለቱ ሪፖርት</p>
+                </div>
+
+                <!-- Sub-tabs for Cashier -->
+                <div class="flex items-center space-x-2 space-x-reverse bg-gray-100 p-1.5 rounded-xl text-xs font-bold">
+                    <button onclick="switchCashierSubTab('tables')" id="subtab-btn-tables" class="subtab-btn px-4 py-2 rounded-lg bg-brand-600 text-white shadow">
+                        <i class="fa-solid fa-table-cells"></i> <span id="txt-subtab-tables">የጠረጴዛዎች ሁኔታ</span>
+                    </button>
+                    <button onclick="switchCashierSubTab('walkin')" id="subtab-btn-walkin" class="subtab-btn px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-200">
+                        <i class="fa-solid fa-pen-to-square"></i> <span id="txt-subtab-walkin">ከስካን ውጪ ማዘዣ (Walk-in POS)</span>
+                    </button>
+                    <button onclick="switchCashierSubTab('eod')" id="subtab-btn-eod" class="subtab-btn px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-200">
+                        <i class="fa-solid fa-chart-line"></i> <span id="txt-subtab-eod">የዕለቱ ሪፖርት (EOD Report)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- LIVE ALERTS & WAITER CALLS FEED FOR CASHIER -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <!-- Ready Items Feed -->
+                <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl shadow-sm space-y-2">
+                    <h4 class="text-xs font-extrabold text-brand-900 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                        <span id="txt-ready-feed-title">የደረሱ ምግቦች / መጠጦች (Ready Items Feed)</span>
+                    </h4>
+                    <div id="ready-alerts-list" class="space-y-1.5 max-h-40 overflow-y-auto">
+                        <p class="text-xs text-gray-400">ምንም አዲስ የደረሰ ትዕዛዝ የለም።</p>
+                    </div>
+                </div>
+
+                <!-- Waiter Call Feed -->
+                <div class="bg-rose-50 border border-rose-200 p-4 rounded-2xl shadow-sm space-y-2">
+                    <h4 class="text-xs font-extrabold text-rose-900 flex items-center gap-2">
+                        <i class="fa-solid fa-bell text-rose-600 animate-bounce"></i>
+                        <span id="txt-waiter-feed-title">የአስተናጋጅ ጥሪዎች (Waiter Calls)</span>
+                    </h4>
+                    <div id="waiter-calls-list" class="space-y-1.5 max-h-40 overflow-y-auto">
+                        <p class="text-xs text-gray-400">ምንም ጥሪ የለም።</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- CASHIER SUB-TAB 1: TABLES GRID -->
+            <div id="cashier-subtab-tables" class="space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" id="cashier-tables-grid">
+                    <!-- Populated dynamically (Tables 1 to 10) -->
+                </div>
+            </div>
+
+            <!-- CASHIER SUB-TAB 2: MANUAL WALKIN POS -->
+            <div id="cashier-subtab-walkin" class="hidden bg-white p-6 rounded-2xl shadow-md border border-gray-200 space-y-6">
+                <div class="border-b pb-4">
+                    <h3 class="text-lg font-black text-brand-900 flex items-center gap-2">
+                        <i class="fa-solid fa-keyboard text-brand-600"></i>
+                        <span id="txt-walkin-title">በካሸር የሚመዘገብ ትዕዛዝ (Manual Walk-in Order POS)</span>
+                    </h3>
+                    <p id="txt-walkin-desc" class="text-xs text-gray-500">ስልክ ለሌላቸው ደንበኞች ወይም በቀጥታ በካሸር ለታዘዙ ትዕዛዞች መጠቀሚያ <code>[ከስካን ውጪ / Walk-in]</code></p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Table Selector & Category Menu -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <div class="flex items-center gap-3">
+                            <label id="txt-pos-table-label" class="text-xs font-bold text-gray-700">ጠረጴዛ ይምረጡ:</label>
+                            <select id="pos-table-select" class="text-xs p-2.5 border rounded-xl bg-gray-50 font-bold text-brand-900 outline-none focus:ring-2 focus:ring-brand-500">
+                                <option value="1">ጠረጴዛ 1</option>
+                                <option value="2">ጠረጴዛ 2</option>
+                                <option value="3">ጠረጴዛ 3</option>
+                                <option value="4">ጠረጴዛ 4</option>
+                                <option value="5">ጠረጴዛ 5</option>
+                                <option value="6">ጠረጴዛ 6</option>
+                                <option value="7">ጠረጴዛ 7</option>
+                                <option value="8">ጠረጴዛ 8</option>
+                                <option value="9">ጠረጴዛ 9</option>
+                                <option value="10">ጠረጴዛ 10</option>
+                                <option value="Takeaway">ለይዞ መሄድ (Takeaway)</option>
+                            </select>
+                        </div>
+
+                        <!-- Menu Quick Picker Grid -->
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="pos-menu-picker">
+                            <!-- JS Populated -->
+                        </div>
+                    </div>
+
+                    <!-- POS Cart & Checkout -->
+                    <div class="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-4">
+                        <h4 id="txt-pos-cart-title" class="text-sm font-extrabold text-brand-900 border-b pb-2">የተመረጡ ምግቦች (Walk-in Items)</h4>
+                        <div id="pos-cart-items" class="space-y-2 max-h-56 overflow-y-auto">
+                            <p class="text-xs text-gray-400 text-center py-6">ምንም አልተመረጠም።</p>
+                        </div>
+                        <div class="border-t pt-3 space-y-2">
+                            <div class="flex justify-between text-base font-black text-brand-900">
+                                <span id="txt-pos-total font-bold">ጠቅላላ:</span>
+                                <span id="pos-cart-total" class="text-brand-600 font-bold">0 ETB</span>
+                            </div>
+                            <button onclick="submitWalkinOrder()" class="w-full bg-brand-700 text-white font-bold py-3 rounded-xl shadow hover:bg-brand-800 transition text-xs flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                <span id="txt-btn-pos-submit">ትዕዛዝ አስተላልፍ (Route to KDS)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CASHIER SUB-TAB 3: END OF DAY (EOD) REPORT -->
+            <div id="cashier-subtab-eod" class="hidden space-y-6">
+                
+                <!-- TOP METRICS CARDS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex items-center justify-between">
+                        <div>
+                            <p id="txt-stat-rev-title" class="text-xs font-semibold text-gray-500">ጠቅላላ ገቢ (Total Revenue)</p>
+                            <h3 id="stat-total-revenue" class="text-2xl font-black text-brand-900 mt-1">0 ETB</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-emerald-100 text-brand-700 flex items-center justify-center text-xl font-bold">
+                            💰
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex items-center justify-between">
+                        <div>
+                            <p id="txt-stat-orders-title" class="text-xs font-semibold text-gray-500">ጠቅላላ ትዕዛዞች (Orders Count)</p>
+                            <h3 id="stat-total-orders" class="text-2xl font-black text-brand-900 mt-1">0</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-bold">
+                            📋
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex items-center justify-between">
+                        <div>
+                            <p id="txt-stat-qr-title" class="text-xs font-semibold text-gray-500">በ QR ስካን (QR Scan Rev)</p>
+                            <h3 id="stat-qr-revenue" class="text-2xl font-black text-emerald-600 mt-1">0 ETB</h3>
+                            <p id="stat-qr-count" class="text-[11px] text-gray-400 font-bold">0 ትዕዛዞች</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                            📱
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex items-center justify-between">
+                        <div>
+                            <p id="txt-stat-walkin-title" class="text-xs font-semibold text-gray-500">ከስካን ውጪ (Walk-in Rev)</p>
+                            <h3 id="stat-walkin-revenue" class="text-2xl font-black text-amber-600 mt-1">0 ETB</h3>
+                            <p id="stat-walkin-count" class="text-[11px] text-gray-400 font-bold">0 ትዕዛዞች</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+                            ✍️
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DOWNLOAD REPORT WORD BUTTON -->
+                <div class="bg-gradient-to-r from-brand-900 via-brand-800 to-brand-900 text-white p-6 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h3 id="txt-doc-title" class="text-lg font-black flex items-center gap-2">
+                            <i class="fa-solid fa-file-word text-blue-300 text-xl"></i>
+                            የዕለቱን የሽያጭ ሪፖርት በ Word Document አውርድ
+                        </h3>
+                        <p id="txt-doc-desc" class="text-xs text-emerald-200">የዕለቱን ጠቅላላ ገቢ፣ የ QR ስካንና Walk-in ንጽጽር፣ ተወዳጅ ምግቦችና ዝርዝር ሂሳቦችን በ MS Word (.doc) ያውርዱ።</p>
+                    </div>
+                    <button onclick="downloadWordReport()" class="bg-amber-400 hover:bg-amber-300 text-brand-950 font-extrabold px-6 py-3 rounded-xl shadow-lg transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-download"></i>
+                        <span id="txt-btn-download-word">📄 የዕለቱን ሪፖርት በ Word (.doc) አውርድ</span>
+                    </button>
+                </div>
+
+                <!-- RANKED BEST SELLERS & DETAILED LOGS -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Ranked Best Sellers Table (1 Col) -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+                        <h4 id="txt-bestsellers-title" class="text-sm font-extrabold text-brand-900 border-b pb-2 flex items-center gap-2">
+                            <i class="fa-solid fa-crown text-amber-500"></i>
+                            በብዛት የተሸጡ ምግቦች (Best-Sellers)
+                        </h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b text-gray-600">
+                                        <th class="p-2">ተ.ቁ</th>
+                                        <th class="p-2">ምግብ/መጠጥ</th>
+                                        <th class="p-2 text-center">ብዛት</th>
+                                        <th class="p-2 text-right">ገቢ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bestsellers-table-body">
+                                    <tr><td colspan="4" class="text-center p-4 text-gray-400">ምንም መረጃ የለም።</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Transaction Log Table (2 Cols) -->
+                    <div class="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+                        <h4 id="txt-translog-title" class="text-sm font-extrabold text-brand-900 border-b pb-2 flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-brand-600"></i>
+                            የተጠናቀቁ ትዕዛዞች ዝርዝር (Timestamped Transactions)
+                        </h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b text-gray-600">
+                                        <th class="p-2">ጊዜ</th>
+                                        <th class="p-2">ጠረጴዛ</th>
+                                        <th class="p-2">ዓይነት</th>
+                                        <th class="p-2">የታዘዙ ምግቦች</th>
+                                        <th class="p-2 text-right">ጠቅላላ ሂሳብ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactions-table-body">
+                                    <tr><td colspan="5" class="text-center p-4 text-gray-400">ምንም የተጠናቀቀ ትዕዛዝ የለም።</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-brand-900 text-emerald-200 py-4 border-t border-brand-800 text-center text-xs mt-8">
+        <p>© 2026 Smart Cafe Real-Time Cloud Ordering System | Powered by Firebase Realtime DB</p>
+    </footer>
+
+    <!-- ========================================== -->
+    <!-- MODALS & POP-UPS CONTAINER                 -->
+    <!-- ========================================== -->
+
+    <!-- 1. HOUSE SPECIAL POPUP MODAL -->
+    <div id="modal-house-special" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-emerald-100 transform transition-all animate-scale">
+            <div class="relative h-48 bg-gradient-to-r from-brand-900 to-brand-700">
+                <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80" alt="House Special" class="w-full h-full object-cover opacity-80">
+                <button onclick="closeHouseSpecialModal()" class="absolute top-3 right-3 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="absolute bottom-3 left-4 bg-amber-400 text-brand-950 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                    ⭐ የዛሬው ልዩ ምግብ / Today's House Special
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <h3 id="txt-hs-title" class="text-xl font-black text-brand-900">ስማርት ካፌ ልዩ ጥብስ ከፍራፍሬ ጋር</h3>
+                <p id="txt-hs-desc" class="text-xs text-gray-600 leading-relaxed">ዛሬም በአሪፍ ተዘጋጅቷል! በለሰለሰ የጥብስ ሥጋ፣ በተጠበሰ ሽንኩርትና ቅመም የታጀበ ልዩ ምግባችንን ይቅመሱ።</p>
+                <div class="flex items-center justify-between border-t border-b py-3">
+                    <span id="txt-hs-price-label" class="text-xs font-bold text-gray-500">ልዩ ዋጋ:</span>
+                    <span class="text-lg font-black text-brand-600">650 ETB</span>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="addHouseSpecialToCart()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-extrabold py-3 rounded-xl shadow-lg transition text-xs flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-cart-plus"></i>
+                        <span id="txt-btn-hs-add">አሁን እዘዝ / Order Now</span>
+                    </button>
+                    <button onclick="closeHouseSpecialModal()" class="px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs">
+                        <span id="txt-btn-hs-skip">ለሌላ ጊዜ</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. WAITER CALL MODAL -->
+    <div id="modal-waiter-call" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 space-y-5 shadow-2xl border border-red-100">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="txt-waiter-modal-title" class="text-base font-extrabold text-brand-900 flex items-center gap-2">
+                    <i class="fa-solid fa-bell text-red-500"></i>
+                    አስተናጋጅ ለመጥራት የሚፈልጉትን ይምረጡ
+                </h3>
+                <button onclick="closeWaiterCallModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-xs font-bold">
+                <button onclick="sendWaiterCall('Need Assistance / እርዳታ እፈልጋለሁ')" class="w-full bg-emerald-50 hover:bg-emerald-100 text-brand-900 p-3 rounded-xl border border-emerald-200 text-right flex items-center justify-between">
+                    <span>🙋‍♂️ ለተጨማሪ እርዳታ / Need Assistance</span>
+                    <i class="fa-solid fa-chevron-left text-brand-600"></i>
+                </button>
+                <button onclick="sendWaiterCall('Ready to Pay Cash / በካሽ ልከፍል ነው')" class="w-full bg-amber-50 hover:bg-amber-100 text-amber-950 p-3 rounded-xl border border-amber-200 text-right flex items-center justify-between">
+                    <span>💵 በካሽ ልከፍል ነው / Ready to Pay Cash</span>
+                    <i class="fa-solid fa-chevron-left text-amber-600"></i>
+                </button>
+                <button onclick="sendWaiterCall('Water & Napkin / ውኃ/ናፕኪን')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-950 p-3 rounded-xl border border-blue-200 text-right flex items-center justify-between">
+                    <span>💧 ውኃ / ናፕኪን (Water & Napkin)</span>
+                    <i class="fa-solid fa-chevron-left text-blue-600"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ROLE LINKS QUICK MODAL (For testing multi-device setup) -->
+    <div id="modal-role-links" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-base font-extrabold text-brand-900 flex items-center gap-2">
+                    <i class="fa-solid fa-laptop-code text-brand-600"></i>
+                    የተለያዩ መሳሪያዎች ሊንክ (Role Links Test)
+                </h3>
+                <button onclick="closeRoleModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <p class="text-xs text-gray-500">ለእያንዳንዱ መሳሪያ ወይም ታብሌት የሚሆን ሊንክ ኮፒ በማድረግ ወይም በመጫን መሞከር ይችላሉ፦</p>
+            <div class="space-y-2 text-xs font-medium">
+                <div class="bg-gray-50 p-2.5 rounded-xl border flex items-center justify-between">
+                    <span>📱 <strong>Customer (Table 1):</strong> <code>?role=customer&table=1</code></span>
+                    <a href="?role=customer&table=1" target="_blank" class="bg-brand-600 text-white px-3 py-1 rounded-lg text-xs font-bold">ክፈት</a>
+                </div>
+                <div class="bg-gray-50 p-2.5 rounded-xl border flex items-center justify-between">
+                    <span>🍳 <strong>Kitchen Tablet:</strong> <code>?role=kitchen</code></span>
+                    <a href="?role=kitchen" target="_blank" class="bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-bold">ክፈት</a>
+                </div>
+                <div class="bg-gray-50 p-2.5 rounded-xl border flex items-center justify-between">
+                    <span>☕ <strong>Barista Tablet:</strong> <code>?role=barista</code></span>
+                    <a href="?role=barista" target="_blank" class="bg-amber-600 text-white px-3 py-1 rounded-lg text-xs font-bold">ክፈት</a>
+                </div>
+                <div class="bg-gray-50 p-2.5 rounded-xl border flex items-center justify-between">
+                    <span>💻 <strong>Cashier Tablet:</strong> <code>?role=cashier</code></span>
+                    <a href="?role=cashier" target="_blank" class="bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-bold">ክፈት</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- JAVASCRIPT LOGIC & FIREBASE REALTIME ENGINE -->
+    <!-- ========================================== -->
+    <script>
+        // ------------------------------------------------------------------
+        // 1. EXACT FIREBASE REALTIME DB CONFIGURATION
+        // ------------------------------------------------------------------
+        const firebaseConfig = {
+            apiKey: "AIzaSyDFSCUEYddOxT7HQZYp2bGsyWlI0LgMgCE",
+            authDomain: "smart-cafe-db-b122a.firebaseapp.com",
+            databaseURL: "https://smart-cafe-db-b122a-default-rtdb.firebaseio.com",
+            projectId: "smart-cafe-db-b122a",
+            storageBucket: "smart-cafe-db-b122a.firebasestorage.app",
+            messagingSenderId: "253803733681",
+            appId: "1:253803733681:web:e7116bbf9e455366acf890",
+            measurementId: "G-9LN1QJVNEM"
+        };
+
+        // Initialize Firebase Compat
+        let db = null;
+        let isFirebaseConnected = false;
+
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.database();
+            isFirebaseConnected = true;
+        } catch (err) {
+            console.warn("Firebase initialization warning. Falling back to local storage.", err);
+        }
+
+        // ------------------------------------------------------------------
+        // 2. 18 REALISTIC MENU ITEMS (FOOD, HOT, JUICE, SOFT)
+        // ------------------------------------------------------------------
+        const menuItems = [
+            // FOOD (Kitchen)
+            { id: 101, category: 'food', nameAm: 'ልዩ የጥብስ ፍስፍስ', nameEn: 'Special Tibs Firfir', price: 420, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=400&q=80', descAm: 'በለሰለሰ የጥብስ ሥጋና በቅመም የታጀበ', descEn: 'Tender beef tibs with spicy firfir' },
+            { id: 102, category: 'food', nameAm: 'የበሬ ጥብስ', nameEn: 'Beef Tibs', price: 480, img: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=400&q=80', descAm: 'ከሽንኩርትና ቃሪያ ጋር የተጠበሰ', descEn: 'Sautéed beef with onions & green peppers' },
+            { id: 103, category: 'food', nameAm: 'ልዩ የዶሮ ወጥ', nameEn: 'Special Doro Wot', price: 550, img: 'https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?auto=format&fit=crop&w=400&q=80', descAm: 'ከእንቁላል ጋር የተሰራ በባህላዊ ቅመም', descEn: 'Traditional chicken stew with egg' },
+            { id: 104, category: 'food', nameAm: 'የጾም በየዓይነቱ', nameEn: 'Fastine Beyaynetu', price: 320, img: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=400&q=80', descAm: 'የተለያዩ አትክልቶችና ምስር ክክ', descEn: 'Assorted vegan vegetarian dishes' },
+            { id: 105, category: 'food', nameAm: 'ስማርት በርግስ ከቺፕስ ጋር', nameEn: 'Smart Beef Burger & Fries', price: 450, img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=400&q=80', descAm: 'ድርብ ቺዝ፣ የከብት ሥጋና ድንች', descEn: 'Double cheese, beef patty & crispy fries' },
+            { id: 106, category: 'food', nameAm: 'ክላሲክ ክለብ ሳንድዊች', nameEn: 'Classic Club Sandwich', price: 380, img: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=400&q=80', descAm: 'ከዶሮ ሥጋ፣ እንቁላልና ቺዝ ጋር', descEn: 'Chicken, egg, cheese & fresh toast' },
+            { id: 107, category: 'food', nameAm: 'ፓስታ በስጋ ሶስ', nameEn: 'Bolognese Pasta', price: 350, img: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=400&q=80', descAm: 'በጥ በጥ ያለ የጣሊያን ፓስታ በስጋ', descEn: 'Italian pasta with rich minced meat sauce' },
+            { id: 108, category: 'food', nameAm: 'አትክልት ፒዛ', nameEn: 'Vegetable Pizza', price: 490, img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80', descAm: 'በሞዛሬላ ቺዝ፣ ዘይቱንና አትክልት', descEn: 'Mozzarella cheese, olives & fresh veggies' },
+
+            // HOT BEVERAGES (Barista)
+            { id: 201, category: 'hot', nameAm: 'ልዩ ማኪያቶ', nameEn: 'Special Macchiato', price: 70, img: 'https://images.unsplash.com/photo-1534778101976-62847782c213?auto=format&fit=crop&w=400&q=80', descAm: 'የተመረጠ ሀበሻ ቡና ከወተት ጋር', descEn: 'Ethiopian espresso layered with milk' },
+            { id: 202, category: 'hot', nameAm: 'ኤስፕሬሶ', nameEn: 'Double Espresso', price: 60, img: 'https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?auto=format&fit=crop&w=400&q=80', descAm: 'ጠንካራና ንጹህ ቡና', descEn: 'Rich, bold double espresso shot' },
+            { id: 203, category: 'hot', nameAm: 'የቅመም ሻይ', nameEn: 'Spiced Tea', price: 50, img: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=400&q=80', descAm: 'በቅርንፉድና ቀረፋ የታጀበ', descEn: 'Infused with cloves & cinnamon' },
+            { id: 204, category: 'hot', nameAm: 'ካፑቺኖ ከኮኮዋ ጋር', nameEn: 'Cappuccino with Cocoa', price: 90, img: 'https://images.unsplash.com/photo-1572442388796-11668ba69e54?auto=format&fit=crop&w=400&q=80', descAm: 'በወተት አረፋና ኮኮዋ የተጌጠ', descEn: 'Frothy milk cappuccino dusted with cocoa' },
+
+            // JUICES (Barista)
+            { id: 301, category: 'juice', nameAm: 'ተፈጥሯዊ አቮካዶ ጁስ', nameEn: 'Fresh Avocado Juice', price: 120, img: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=400&q=80', descAm: 'ከቪምቶና ሎሚ ጋር የቀረበ', descEn: 'Pure creamy avocado with vimto accent' },
+            { id: 302, category: 'juice', nameAm: 'የማንጎ ጁስ', nameEn: 'Fresh Mango Juice', price: 110, img: 'https://images.unsplash.com/photo-1546173159-315724a31696?auto=format&fit=crop&w=400&q=80', descAm: 'ንጹህና የተፈጥሮ ማንጎ', descEn: '100% natural mango pulp' },
+            { id: 303, category: 'juice', nameAm: 'ስፕሪስ (ልዩ ቅልቅል)', nameEn: 'Spris Mixed Juice', price: 130, img: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=400&q=80', descAm: 'አቮካዶ፣ ማንጎና ፓፓያ', descEn: 'Layered Avocado, Mango & Papaya' },
+
+            // SOFT DRINKS (Barista)
+            { id: 401, category: 'soft', nameAm: 'ኮካ ኮላ (Coca Cola)', price: 45, img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=400&q=80', descAm: 'ቀዝቃዛ ሶዳ', descEn: 'Chilled soft drink' },
+            { id: 402, category: 'soft', nameAm: 'ፋንታ (Fanta)', price: 45, img: 'https://images.unsplash.com/photo-1624517452488-04869289c4ca?auto=format&fit=crop&w=400&q=80', descAm: 'የብርቱካን ጣዕም ቀዝቃዛ መጠጥ', descEn: 'Orange flavoured chilled soda' },
+            { id: 403, category: 'soft', nameAm: 'የታሸገ ውኃ (1.5L)', nameEn: 'Mineral Water (1.5L)', price: 40, img: 'https://images.unsplash.com/photo-1560023907-5f313c87531a?auto=format&fit=crop&w=400&q=80', descAm: 'ንጹህ የተፈጥሮ ውኃ', descEn: 'Pure natural mineral water' },
+            { id: 404, category: 'soft', nameAm: 'ቅዱስ ጊዮርጊስ ቢራ', nameEn: 'St. George Beer', price: 75, img: 'https://images.unsplash.com/photo-1608270586620-248524c67de9?auto=format&fit=crop&w=400&q=80', descAm: 'ቀዝቃዛ የሀገር ውስጥ ቢራ', descEn: 'Chilled local premium lager beer' }
+        ];
+
+        // ------------------------------------------------------------------
+        // 3. GLOBAL STATE & BILINGUAL DICTIONARY
+        // ------------------------------------------------------------------
+        let currentLang = 'am'; // 'am' or 'en'
+        let currentRole = null; // 'customer', 'kitchen', 'barista', 'cashier' or null (all)
+        let currentTableNum = 1;
+        let cart = [];
+        let tipAmount = 0;
+        let splitPersons = 1;
+
+        // Central State synced with Firebase path `smartCafe/state`
+        let smartCafeState = {
+            orders: {},      // keyed by orderId
+            alerts: [],      // ready alerts for cashier
+            waiterCalls: [], // waiter calls for cashier
+            eodLog: []       // paid closed transactions
+        };
+
+        // Translations Dictionary
+        const i18n = {
+            am: {
+                cateringBanner: 'ልዩ የሠርግ፣ የስብሰባ እና የሙሉ ኬተሪንግ አገልግሎት እንሰጣለን! | 📞 0911-23-45-67',
+                roleLinksBtn: 'የስክሪን ሊንኮች',
+                tabCustomer: 'የደንበኛ ማዘዣ (QR Menu)',
+                tabKitchen: 'ማብሰያ ቤት (Kitchen KDS)',
+                tabBarista: 'ባሪስታ / መጠጥ (Barista KDS)',
+                tabCashier: 'ካሸር / POS & EOD',
+                custTableTitle: 'ጠረጴዛ',
+                custSubtitle: 'ይመገቡ፣ ይደሰቱ! ትዕዛዝዎን ከታች ከተዘረዘሩት ይምረጡ።',
+                btnCallWaiter: '🔔 አስተናጋጅ ጥራ / Call Waiter',
+                catAll: 'ሁሉም / All',
+                catFood: '🍲 ዋና ዋና ምግቦች',
+                catHot: '☕ ሙቅ መጠጦች',
+                catJuice: '🧃 ተፈጥሯዊ ጁሶች',
+                catSoft: '🥤 ቀዝቃዛ መጠጦች',
+                cartTitle: 'የመረጧቸው ምግቦች (Cart)',
+                cartEmpty: 'ምንም አልተመረጠም። ከምናሌው ላይ ይምረጡ።',
+                labelNote: 'ልዩ ማስታወሻ (Special Note):',
+                labelTip: 'ጉርሻ / Tip (ETB):',
+                labelSplit: '👥 ሂሳብ መክፈያ (Split Bill):',
+                btnAddPeople: 'ሰዎች ጨምር',
+                btnPeopleAdded: 'ተጨምሯል ✓',
+                splitPerPerson: 'ለአንድ ሰው የሚደርሰው:',
+                cashNotice: '💵 ክፍያ በካሽ ብቻ ይፈጸማል (Cash Payment Only)',
+                subtotal: 'የምግብ ዋጋ:',
+                tipAmt: 'ጉርሻ:',
+                totalBill: 'ጠቅላላ ሂሳብ:',
+                btnSubmitOrder: 'ትዕዛዝ ላክ (Submit Order)',
+                activeBillTitle: 'የሂሳብ ማጠቃለያና የትዕዛዝ ሁኔታ',
+                activeSubtotal: 'የምግብ ዋጋ:',
+                activeTip: 'ጉርሻ (Tip):',
+                activeTotal: 'ጠቅላላ የሚከፈል:',
+                orderProgress: 'የትዕዛዙ ሂደት:',
+                cashierPayingHint: '💳 ሂሳብዎን ለመክፈል ለካሸሩ በጥሬ ገንዘብ (Cash) ይክፈሉ።',
+                lockTitle: 'ትዕዛዝዎ በዝግጅት ላይ ነው! / Your Order is Active!',
+                lockDesc: 'ስክሪኑ እስከሚከፈል ድረስ ተቆልፏል። ተጨማሪ ማዘዝ ከፈለጉ "ተጨማሪ ጨምር" የሚለውን ይጫኑ።',
+                btnAddMore: 'ተጨማሪ ትዕዛዝ ጨምር',
+                btnViewBill: 'ሂሳብ ተመልከት',
+                addonWaitTitle: 'የካሸር ማረጋገጫ በመጠባበቅ ላይ...',
+                addonWaitDesc: 'ያዘዙት ተጨማሪ ምግብ በካሸሩ ሲረጋገጥ ወደ ማብሰያ ቤት ይላካል!',
+                kdsKitchenTitle: 'ማብሰያ ቤት (Kitchen Display System)',
+                kdsKitchenDesc: 'ዋና ዋና ምግቦችና ፍራፍሬዎች ብቻ የሚታዩበት ስክሪን',
+                kdsBaristaTitle: 'ባሪስታ / መጠጥ ቤት (Barista KDS)',
+                kdsBaristaDesc: 'ሙቅ መጠጦች፣ ተፈጥሯዊ ጁሶች እና ቀዝቃዛ መጠጦች ብቻ',
+                cashierTitle: 'ካሸር / ዋና ማስተናገጃ (Cashier POS)',
+                cashierSubtitle: 'የጠረጴዛዎች ሁኔታ፣ ክፍያዎች፣ የካሽ አሰባሰብና የዕለቱ ሪፖርት',
+                subtabTables: 'የጠረጴዛዎች ሁኔታ',
+                subtabWalkin: 'ከስካን ውጪ ማዘዣ (Walk-in POS)',
+                subtabEod: 'የዕለቱ ሪፖርት (EOD Report)',
+                readyFeedTitle: 'የደረሱ ምግቦች / መጠጦች (Ready Items Feed)',
+                waiterFeedTitle: 'የአስተናጋጅ ጥሪዎች (Waiter Calls)',
+                walkinTitle: 'በካሸር የሚመዘገብ ትዕዛዝ (Manual Walk-in Order POS)',
+                walkinDesc: 'ስልክ ለሌላቸው ደንበኞች ወይም በቀጥታ በካሸር ለታዘዙ ትዕዛዞች መጠቀሚያ [ከስካን ውጪ / Walk-in]',
+                posTableLabel: 'ጠረጴዛ ይምረጡ:',
+                posCartTitle: 'የተመረጡ ምግቦች (Walk-in Items)',
+                posTotal: 'ጠቅላላ:',
+                btnPosSubmit: 'ትዕዛዝ አስተላልፍ (Route to KDS)',
+                statRevTitle: 'ጠቅላላ ገቢ (Total Revenue)',
+                statOrdersTitle: 'ጠቅላላ ትዕዛዞች (Orders Count)',
+                statQrTitle: 'በ QR ስካን (QR Scan Rev)',
+                statWalkinTitle: 'ከስካን ውጪ (Walk-in Rev)',
+                docTitle: 'የዕለቱን የሽያጭ ሪፖርት በ Word Document አውርድ',
+                docDesc: 'የዕለቱን ጠቅላላ ገቢ፣ የ QR ስካንና Walk-in ንጽጽር፣ ተወዳጅ ምግቦችና ዝርዝር ሂሳቦችን በ MS Word (.doc) ያውርዱ።',
+                btnDownloadWord: '📄 የዕለቱን ሪፖርት በ Word (.doc) አውርድ',
+                bestsellersTitle: 'በብዛት የተሸጡ ምግቦች (Best-Sellers)',
+                translogTitle: 'የተጠናቀቁ ትዕዛዞች ዝርዝር (Timestamped Transactions)'
+            },
+            en: {
+                cateringBanner: 'Special Wedding, Meeting & Full Catering Services Available! | 📞 0911-23-45-67',
+                roleLinksBtn: 'Screen Links',
+                tabCustomer: 'Customer Menu (QR)',
+                tabKitchen: 'Kitchen KDS',
+                tabBarista: 'Barista KDS',
+                tabCashier: 'Cashier POS & EOD',
+                custTableTitle: 'Table',
+                custSubtitle: 'Enjoy your meal! Select items from the menu below.',
+                btnCallWaiter: '🔔 Call Waiter',
+                catAll: 'All Items',
+                catFood: '🍲 Main Dishes',
+                catHot: '☕ Hot Drinks',
+                catJuice: '🧃 Fresh Juices',
+                catSoft: '🥤 Soft Drinks',
+                cartTitle: 'Your Cart Items',
+                cartEmpty: 'Your cart is empty. Select items from menu.',
+                labelNote: 'Special Note:',
+                labelTip: 'Tip (ETB):',
+                labelSplit: '👥 Split Bill:',
+                btnAddPeople: 'Add People',
+                btnPeopleAdded: 'Added ✓',
+                splitPerPerson: 'Amount Per Person:',
+                cashNotice: '💵 Cash Payment Only',
+                subtotal: 'Food Subtotal:',
+                tipAmt: 'Tip:',
+                totalBill: 'Total Bill:',
+                btnSubmitOrder: 'Submit Order',
+                activeBillTitle: 'Bill Summary & Order Status',
+                activeSubtotal: 'Subtotal:',
+                activeTip: 'Tip:',
+                activeTotal: 'Total Payable:',
+                orderProgress: 'Order Status Progress:',
+                cashierPayingHint: '💳 Please pay cash to cashier when ready.',
+                lockTitle: 'Your Order is Active!',
+                lockDesc: 'Screen locked until payment is confirmed. Click "Add More" for extra items.',
+                btnAddMore: 'Add More Items',
+                btnViewBill: 'View Bill',
+                addonWaitTitle: 'Waiting for Cashier Confirmation...',
+                addonWaitDesc: 'Your extra items will route to kitchen once cashier approves!',
+                kdsKitchenTitle: 'Kitchen Display System (KDS)',
+                kdsKitchenDesc: 'Food & Fruit items order station',
+                kdsBaristaTitle: 'Barista KDS Display',
+                kdsBaristaDesc: 'Hot drinks, juices and soft drinks station',
+                cashierTitle: 'Cashier POS & Main Control',
+                cashierSubtitle: 'Tables grid, payments, cash collection & EOD Report',
+                subtabTables: 'Tables Grid',
+                subtabWalkin: 'Manual Walk-in POS',
+                subtabEod: 'EOD Report',
+                readyFeedTitle: 'Ready Items Feed',
+                waiterFeedTitle: 'Waiter Calls Feed',
+                walkinTitle: 'Manual Walk-in Order POS',
+                walkinDesc: 'For walk-in customers without phones [Tagged Walk-in]',
+                posTableLabel: 'Select Table:',
+                posCartTitle: 'Selected Walk-in Items',
+                posTotal: 'Total:',
+                btnPosSubmit: 'Send to KDS',
+                statRevTitle: 'Total Revenue',
+                statOrdersTitle: 'Total Orders',
+                statQrTitle: 'QR Scan Revenue',
+                statWalkinTitle: 'Walk-in Revenue',
+                docTitle: 'Download EOD Sales Report in MS Word',
+                docDesc: 'Export daily revenues, QR vs Walk-in breakdown, best-sellers & logs to .doc file.',
+                btnDownloadWord: '📄 Download Word Report (.doc)',
+                bestsellersTitle: 'Ranked Best-Sellers',
+                translogTitle: 'Completed Transactions Log'
+            }
+        };
+
+        // ------------------------------------------------------------------
+        // 4. WEB AUDIO SYNTHESIZER FOR SOUND CHIMES (No external mp3)
+        // ------------------------------------------------------------------
+        function playChimeSound(type = 'new') {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'new') {
+                    // Soft dual-tone bell chime for NEW order
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, now); // D5
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                } else if (type === 'ready') {
+                    // Upbeat triple chime for READY
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                }
+            } catch (e) {
+                console.log("Web audio sound error", e);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // 5. INITIALIZATION & ROUTING ENGINE
+        // ------------------------------------------------------------------
+        window.addEventListener('DOMContentLoaded', () => {
+            parseQueryParams();
+            renderMenu();
+            renderWalkinMenuPicker();
+            setupFirebaseSync();
+
+            // Auto-show House Special Popup on first load for Customer
+            if (currentRole === 'customer' || !currentRole) {
+                setTimeout(() => {
+                    const hsModal = document.getElementById('modal-house-special');
+                    if (hsModal) hsModal.classList.remove('hidden');
+                }, 800);
+            }
+        });
+
+        // Parse query params like ?role=customer&table=3
+        function parseQueryParams() {
+            const params = new URLSearchParams(window.location.search);
+            const role = params.get('role');
+            const table = params.get('table');
+
+            if (table) {
+                currentTableNum = parseInt(table) || 1;
+            }
+            document.getElementById('cust-table-num').innerText = currentTableNum;
+
+            if (role) {
+                currentRole = role.toLowerCase();
+                // Hide tabs for strict role isolation
+                document.getElementById('role-nav-tabs').classList.add('hidden');
+                document.getElementById('role-links-btn').classList.add('hidden');
+                document.getElementById('role-badge').innerText = role.toUpperCase();
+
+                if (currentRole === 'customer') {
+                    document.getElementById('table-indicator').innerText = `ጠረጴዛ / Table #${currentTableNum}`;
+                    showOnlyView('customer');
+                } else if (currentRole === 'kitchen') {
+                    document.getElementById('table-indicator').innerText = `KDS Tablet 1`;
+                    showOnlyView('kitchen');
+                } else if (currentRole === 'barista') {
+                    document.getElementById('table-indicator').innerText = `KDS Tablet 2`;
+                    showOnlyView('barista');
+                } else if (currentRole === 'cashier') {
+                    document.getElementById('table-indicator').innerText = `Cashier POS Tablet 3`;
+                    showOnlyView('cashier');
+                }
+            } else {
+                // Admin mode - show all tabs
+                showOnlyView('customer');
+            }
+        }
+
+        function showOnlyView(viewName) {
+            ['customer', 'kitchen', 'barista', 'cashier'].forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) el.classList.add('hidden');
+            });
+            const activeEl = document.getElementById(`view-${viewName}`);
+            if (activeEl) activeEl.classList.remove('hidden');
+
+            // Update nav tab highlights if visible
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-emerald-500', 'text-white');
+                btn.classList.add('bg-brand-800', 'text-emerald-200');
+            });
+            const activeTabBtn = document.getElementById(`tab-btn-${viewName}`);
+            if (activeTabBtn) {
+                activeTabBtn.classList.remove('bg-brand-800', 'text-emerald-200');
+                activeTabBtn.classList.add('bg-emerald-500', 'text-white');
+            }
+        }
+
+        function switchTab(roleName) {
+            showOnlyView(roleName);
+        }
+
+        function switchCashierSubTab(subName) {
+            ['tables', 'walkin', 'eod'].forEach(s => {
+                const el = document.getElementById(`cashier-subtab-${s}`);
+                if (el) el.classList.add('hidden');
+                const btn = document.getElementById(`subtab-btn-${s}`);
+                if (btn) {
+                    btn.classList.remove('bg-brand-600', 'text-white', 'shadow');
+                    btn.classList.add('text-gray-700');
+                }
+            });
+            document.getElementById(`cashier-subtab-${subName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`subtab-btn-${subName}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-brand-600', 'text-white', 'shadow');
+                activeBtn.classList.remove('text-gray-700');
+            }
+            if (subName === 'eod') renderEODReport();
+        }
+
+        // ------------------------------------------------------------------
+        // 6. FIREBASE REALTIME DB SYNC & LOCALSTORAGE FALLBACK
+        // ------------------------------------------------------------------
+        function setupFirebaseSync() {
+            if (isFirebaseConnected && db) {
+                const stateRef = db.ref('smartCafe/state');
+
+                // Realtime Listener
+                stateRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        smartCafeState = data;
+                        if (!smartCafeState.orders) smartCafeState.orders = {};
+                        if (!smartCafeState.alerts) smartCafeState.alerts = [];
+                        if (!smartCafeState.waiterCalls) smartCafeState.waiterCalls = [];
+                        if (!smartCafeState.eodLog) smartCafeState.eodLog = [];
+                    } else {
+                        // Seed initial state in Firebase
+                        pushStateToFirebase();
+                    }
+                    updateAllUI();
+                    setSyncStatus(true);
+                }, (error) => {
+                    console.error("Firebase Sync Error:", error);
+                    setSyncStatus(false);
+                    loadLocalStorageFallback();
+                });
+            } else {
+                setSyncStatus(false);
+                loadLocalStorageFallback();
+            }
+        }
+
+        function pushStateToFirebase() {
+            if (isFirebaseConnected && db) {
+                db.ref('smartCafe/state').set(smartCafeState);
+            } else {
+                localStorage.setItem('smartCafeState', JSON.stringify(smartCafeState));
+                updateAllUI();
+            }
+        }
+
+        function loadLocalStorageFallback() {
+            const local = localStorage.getItem('smartCafeState');
+            if (local) {
+                try {
+                    smartCafeState = JSON.parse(local);
+                } catch(e) {}
+            }
+            updateAllUI();
+        }
+
+        function setSyncStatus(isLive) {
+            const badge = document.getElementById('sync-status');
+            const txt = document.getElementById('sync-text');
+            if (isLive) {
+                badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-900/60 text-emerald-300 border border-emerald-500/30";
+                txt.innerText = "🟢 Live Cloud Sync";
+            } else {
+                badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-900/60 text-amber-300 border border-amber-500/30";
+                txt.innerText = "🟡 Offline Local Sync";
+            }
+        }
+
+        function updateAllUI() {
+            renderCustomerActiveBill();
+            renderKitchenKDS();
+            renderBaristaKDS();
+            renderCashierTablesGrid();
+            renderCashierFeeds();
+            renderEODReport();
+        }
+
+        // ------------------------------------------------------------------
+        // 7. BILINGUAL TRANSLATION TOGGLE
+        // ------------------------------------------------------------------
+        function toggleLanguage() {
+            currentLang = currentLang === 'am' ? 'en' : 'am';
+            const dict = i18n[currentLang];
+
+            // Translate static elements with ids
+            for (const key in dict) {
+                const elId = 'txt-' + key.replace(/([AZ])/g, '-$1').toLowerCase();
+                const el = document.getElementById(elId);
+                if (el) {
+                    el.innerText = dict[key];
+                }
+            }
+
+            renderMenu();
+            renderCart();
+            updateAllUI();
+        }
+
+        // ------------------------------------------------------------------
+        // 8. MENU RENDERING & CART SYSTEM
+        // ------------------------------------------------------------------
+        let currentCategoryFilter = 'all';
+
+        function renderMenu(categoryFilter = currentCategoryFilter) {
+            currentCategoryFilter = categoryFilter;
+            const grid = document.getElementById('menu-grid');
+            if (!grid) return;
+
+            const filtered = categoryFilter === 'all' 
+                ? menuItems 
+                : menuItems.filter(item => item.category === categoryFilter);
+
+            grid.innerHTML = filtered.map(item => {
+                const cartItem = cart.find(c => c.id === item.id);
+                const qtyInCart = cartItem ? cartItem.qty : 0;
+
+                const actionControls = qtyInCart > 0
+                    ? `
+                        <div class="flex items-center gap-1.5">
+                            <span class="bg-amber-400 text-brand-950 text-xs font-extrabold px-2.5 py-1.5 rounded-xl shadow-sm ring-1 ring-amber-500/40 flex items-center gap-1 select-none">
+                                <span>${currentLang === 'am' ? 'ተጨምሯል ✓' : 'Added ✓'}</span>
+                            </span>
+                            <div class="flex items-center bg-emerald-50 border border-brand-500 rounded-xl shadow-sm overflow-hidden">
+                                <button type="button" onclick="changeCartQty(${item.id}, -1)" class="w-7 h-7 flex items-center justify-center text-sm font-black text-brand-900 hover:bg-brand-600 hover:text-white transition">-</button>
+                                <span class="px-2 text-xs font-black text-brand-950 select-none">${qtyInCart}</span>
+                                <button type="button" onclick="changeCartQty(${item.id}, 1)" class="w-7 h-7 flex items-center justify-center text-sm font-black text-brand-900 hover:bg-brand-600 hover:text-white transition">+</button>
+                            </div>
+                        </div>
+                    `
+                    : `
+                        <button type="button" onclick="addToCart(${item.id})" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow transition flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> <span>${currentLang === 'am' ? 'ጨምር' : 'Add'}</span>
+                        </button>
+                    `;
+
+                return `
+                    <div class="bg-white rounded-2xl p-3.5 shadow-sm border ${qtyInCart > 0 ? 'border-brand-500 ring-1 ring-brand-500/30' : 'border-emerald-100'} flex flex-col justify-between space-y-3 hover:shadow-md transition">
+                        <div class="flex gap-3">
+                            <img src="${item.img}" alt="${item.nameEn}" class="w-20 h-20 rounded-xl object-cover shadow-sm">
+                            <div class="space-y-1 flex-1">
+                                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${getCatBadgeClass(item.category)}">
+                                    ${item.category}
+                                </span>
+                                <h4 class="text-sm font-bold text-gray-800 leading-snug">
+                                    ${currentLang === 'am' ? item.nameAm : item.nameEn}
+                                </h4>
+                                <p class="text-[11px] text-gray-400 line-clamp-2">
+                                    ${currentLang === 'am' ? item.descAm : item.descEn}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between border-t pt-2 gap-2">
+                            <span class="text-sm font-black text-brand-700">${item.price} ETB</span>
+                            ${actionControls}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getCatBadgeClass(cat) {
+            switch(cat) {
+                case 'food': return 'bg-red-100 text-red-800';
+                case 'hot': return 'bg-amber-100 text-amber-800';
+                case 'juice': return 'bg-emerald-100 text-emerald-800';
+                case 'soft': return 'bg-blue-100 text-blue-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        function filterMenu(cat) {
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-600', 'text-white');
+                btn.classList.add('bg-white', 'text-gray-700');
+            });
+            event.currentTarget.classList.add('bg-brand-600', 'text-white');
+            event.currentTarget.classList.remove('bg-white', 'text-gray-700');
+            renderMenu(cat);
+        }
+
+        function addToCart(itemId) {
+            // If table has an active order, customer is adding items (Add-on)
+            const item = menuItems.find(m => m.id === itemId);
+            if (!item) return;
+
+            const existing = cart.find(c => c.id === itemId);
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ ...item, qty: 1 });
+            }
+            renderCart();
+            renderMenu();
+        }
+
+        function changeCartQty(itemId, delta) {
+            const index = cart.findIndex(c => c.id === itemId);
+            if (index !== -1) {
+                cart[index].qty += delta;
+                if (cart[index].qty <= 0) {
+                    cart.splice(index, 1);
+                }
+            }
+            renderCart();
+            renderMenu();
+        }
+
+        function setTip(amount) {
+            tipAmount = amount;
+            document.querySelectorAll('.tip-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-600', 'text-white');
+                btn.classList.add('bg-gray-50');
+            });
+            const activeBtn = document.getElementById(`tip-${amount}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-brand-600', 'text-white');
+                activeBtn.classList.remove('bg-gray-50');
+            }
+            renderCart();
+        }
+
+        function toggleAddPeople() {
+            if (splitPersons === 1) {
+                splitPersons = 2;
+            } else {
+                splitPersons = 1;
+            }
+            updateSplitUI();
+        }
+
+        function changeSplit(delta) {
+            splitPersons = Math.max(1, splitPersons + delta);
+            updateSplitUI();
+        }
+
+        function updateSplitUI() {
+            const isAdded = splitPersons > 1;
+            const dict = i18n[currentLang];
+
+            // Update both Cart Splitter & Active Bill Splitter controls
+            const pairs = [
+                {
+                    btn: document.getElementById('btn-add-people'),
+                    icon: document.getElementById('icon-add-people'),
+                    txt: document.getElementById('txt-btn-add-people'),
+                    count: document.getElementById('split-count')
+                },
+                {
+                    btn: document.getElementById('active-btn-add-people'),
+                    icon: document.getElementById('active-icon-add-people'),
+                    txt: document.getElementById('txt-active-btn-add-people'),
+                    count: document.getElementById('active-split-count')
+                }
+            ];
+
+            pairs.forEach(p => {
+                if (p.count) p.count.innerText = splitPersons;
+                if (p.btn && p.txt && p.icon) {
+                    if (isAdded) {
+                        p.btn.className = "px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 shadow-md bg-amber-400 hover:bg-amber-300 text-brand-950 ring-2 ring-amber-500/50 flex items-center gap-1";
+                        p.icon.className = "fa-solid fa-users-check";
+                        p.txt.innerText = dict.btnPeopleAdded;
+                    } else {
+                        p.btn.className = "px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 shadow-sm bg-brand-600 hover:bg-brand-700 text-white flex items-center gap-1";
+                        p.icon.className = "fa-solid fa-user-plus";
+                        p.txt.innerText = dict.btnAddPeople;
+                    }
+                }
+            });
+
+            renderCart();
+            renderCustomerActiveBill();
+        }
+
+        function renderCart() {
+            const list = document.getElementById('cart-items-list');
+            const subtotalVal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const totalVal = subtotalVal + tipAmount;
+
+            document.getElementById('cart-count-badge').innerText = cart.reduce((sum, item) => sum + item.qty, 0);
+
+            if (cart.length === 0) {
+                list.innerHTML = `<p id="txt-cart-empty" class="text-xs text-gray-400 text-center py-6">${i18n[currentLang].cartEmpty}</p>`;
+            } else {
+                list.innerHTML = cart.map(item => `
+                    <div class="flex items-center justify-between text-xs bg-gray-50 p-2 rounded-xl border border-gray-100">
+                        <div class="flex-1 pr-2">
+                            <h5 class="font-bold text-gray-800">${currentLang === 'am' ? item.nameAm : item.nameEn}</h5>
+                            <span class="text-gray-400 text-[11px]">${item.price} ETB × ${item.qty} = ${item.price * item.qty} ETB</span>
+                        </div>
+                        <div class="flex items-center space-x-1 space-x-reverse bg-white border rounded-lg px-1 py-0.5">
+                            <button onclick="changeCartQty(${item.id}, -1)" class="w-5 h-5 font-black text-gray-500 hover:text-red-500">-</button>
+                            <span class="px-1 font-extrabold text-brand-900">${item.qty}</span>
+                            <button onclick="changeCartQty(${item.id}, 1)" class="w-5 h-5 font-black text-gray-500 hover:text-brand-600">+</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('cart-subtotal-val').innerText = `${subtotalVal} ETB`;
+            document.getElementById('cart-tip-val').innerText = `${tipAmount} ETB`;
+            document.getElementById('cart-total-val').innerText = `${totalVal} ETB`;
+
+            const perPerson = Math.round(totalVal / splitPersons);
+            document.getElementById('split-amount-val').innerText = `${perPerson} ETB`;
+        }
+
+        function addHouseSpecialToCart() {
+            addToCart(101); // Special Tibs
+            closeHouseSpecialModal();
+        }
+
+        function openHouseSpecialModal() { document.getElementById('modal-house-special').classList.remove('hidden'); }
+        function closeHouseSpecialModal() { document.getElementById('modal-house-special').classList.add('hidden'); }
+        function openWaiterCallModal() { document.getElementById('modal-waiter-call').classList.remove('hidden'); }
+        function closeWaiterCallModal() { document.getElementById('modal-waiter-call').classList.add('hidden'); }
+        function openRoleModal() { document.getElementById('modal-role-links').classList.remove('hidden'); }
+        function closeRoleModal() { document.getElementById('modal-role-links').classList.add('hidden'); }
+
+        // ------------------------------------------------------------------
+        // 9. SUBMIT CUSTOMER ORDER & STRICT SCREEN LOCK
+        // ------------------------------------------------------------------
+        function submitCustomerOrder() {
+            if (cart.length === 0) {
+                alert(currentLang === 'am' ? "እባክዎን አስቀድመው ምግብ ይምረጡ!" : "Please select items first!");
+                return;
+            }
+
+            const activeOrder = getActiveOrderByTable(currentTableNum);
+            const note = document.getElementById('cart-note').value || '';
+
+            if (!activeOrder) {
+                // Brand new primary order for table
+                const orderId = 'ORD-' + Date.now().toString().slice(-6);
+                const newOrder = {
+                    orderId: orderId,
+                    tableNum: currentTableNum,
+                    type: 'QR Scan',
+                    status: 'Active', // Active order
+                    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    note: note,
+                    tip: tipAmount,
+                    items: cart.map(item => ({
+                        id: item.id,
+                        nameAm: item.nameAm,
+                        nameEn: item.nameEn,
+                        price: item.price,
+                        qty: item.qty,
+                        category: item.category,
+                        itemStatus: 'NEW', // NEW -> ACK -> READY
+                        approvedByCashier: true
+                    }))
+                };
+
+                smartCafeState.orders[orderId] = newOrder;
+                playChimeSound('new');
+            } else {
+                // Table already has active order -> Add-on Items!
+                // Add-on items require Cashier approval (addonPending = true)
+                const addOnItems = cart.map(item => ({
+                    id: item.id,
+                    nameAm: item.nameAm,
+                    nameEn: item.nameEn,
+                    price: item.price,
+                    qty: item.qty,
+                    category: item.category,
+                    itemStatus: 'NEW',
+                    approvedByCashier: false // Wait for cashier confirmation
+                }));
+
+                activeOrder.items = activeOrder.items.concat(addOnItems);
+                activeOrder.addonPending = true; // Locks customer screen in pending mode
+                activeOrder.tip += tipAmount;
+                if (note) activeOrder.note += ` | Add-on: ${note}`;
+            }
+
+            // Clear Cart
+            cart = [];
+            tipAmount = 0;
+            document.getElementById('cart-note').value = '';
+            renderCart();
+            renderMenu();
+
+            pushStateToFirebase();
+        }
+
+        function getActiveOrderByTable(tableNum) {
+            if (!smartCafeState.orders) return null;
+            return Object.values(smartCafeState.orders).find(o => o.tableNum == tableNum && o.status === 'Active');
+        }
+
+        // Render Active Bill & Enforce Screen Lock for Customer
+        function renderCustomerActiveBill() {
+            const activeOrder = getActiveOrderByTable(currentTableNum);
+            const lockNotice = document.getElementById('customer-lock-notice');
+            const addonPendingNotice = document.getElementById('customer-addon-pending-notice');
+            const billCard = document.getElementById('active-bill-card');
+            const cartCard = document.getElementById('cart-card');
+            const itemsContainer = document.getElementById('active-bill-items');
+
+            if (!activeOrder) {
+                // Unlocked - normal state
+                lockNotice.classList.add('hidden');
+                addonPendingNotice.classList.add('hidden');
+                itemsContainer.innerHTML = `<p class="text-gray-400 text-center py-4">${currentLang === 'am' ? 'በዚህ ጠረጴዛ ላይ ገና አላዘዙም።' : 'No active order for this table.'}</p>`;
+                document.getElementById('active-bill-subtotal').innerText = '0 ETB';
+                document.getElementById('active-bill-tip').innerText = '0 ETB';
+                document.getElementById('active-bill-total').innerText = '0 ETB';
+                document.getElementById('timeline-bar').style.width = '0%';
+                document.getElementById('active-bill-status-pill').innerText = 'ነፃ / Free';
+                return;
+            }
+
+            // Lock Screen Active!
+            lockNotice.classList.remove('hidden');
+
+            // Add-on pending check
+            if (activeOrder.addonPending) {
+                addonPendingNotice.classList.remove('hidden');
+            } else {
+                addonPendingNotice.classList.add('hidden');
+            }
+
+            // Populate active items list
+            const subtotal = activeOrder.items.reduce((s, i) => s + (i.price * i.qty), 0);
+            const total = subtotal + activeOrder.tip;
+
+            itemsContainer.innerHTML = activeOrder.items.map(i => `
+                <div class="flex items-center justify-between bg-emerald-50/50 p-2 rounded-xl border border-emerald-100">
+                    <div>
+                        <span class="font-bold text-gray-800">${currentLang === 'am' ? i.nameAm : i.nameEn}</span>
+                        <span class="text-gray-400 text-[11px] block">${i.price} ETB × ${i.qty}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        ${i.approvedByCashier === false 
+                            ? `<span class="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">ማረጋገጫ በመጠባበቅ</span>` 
+                            : getItemStatusBadge(i.itemStatus)}
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('active-bill-subtotal').innerText = `${subtotal} ETB`;
+            document.getElementById('active-bill-tip').innerText = `${activeOrder.tip} ETB`;
+            document.getElementById('active-bill-total').innerText = `${total} ETB`;
+
+            const activePerPerson = Math.round(total / splitPersons);
+            const activeSplitEl = document.getElementById('active-split-amount-val');
+            if (activeSplitEl) activeSplitEl.innerText = `${activePerPerson} ETB`;
+
+            // Progress Timeline Logic
+            const allApproved = activeOrder.items.filter(i => i.approvedByCashier);
+            const allReady = allApproved.length > 0 && allApproved.every(i => i.itemStatus === 'READY');
+            const anyPrep = allApproved.some(i => i.itemStatus === 'ACK' || i.itemStatus === 'READY');
+
+            if (allReady) {
+                document.getElementById('timeline-bar').style.width = '75%';
+                document.getElementById('active-bill-status-pill').innerText = 'ደርሷል / Ready';
+                document.getElementById('active-bill-status-pill').className = 'bg-emerald-100 text-emerald-800 text-xs font-extrabold px-2.5 py-1 rounded-full uppercase';
+            } else if (anyPrep) {
+                document.getElementById('timeline-bar').style.width = '50%';
+                document.getElementById('active-bill-status-pill').innerText = 'እየተሰራ ነው / Preparing';
+                document.getElementById('active-bill-status-pill').className = 'bg-amber-100 text-amber-800 text-xs font-extrabold px-2.5 py-1 rounded-full uppercase';
+            } else {
+                document.getElementById('timeline-bar').style.width = '25%';
+                document.getElementById('active-bill-status-pill').innerText = 'ተልኳል / Sent';
+                document.getElementById('active-bill-status-pill').className = 'bg-blue-100 text-blue-800 text-xs font-extrabold px-2.5 py-1 rounded-full uppercase';
+            }
+        }
+
+        function getItemStatusBadge(status) {
+            if (status === 'READY') return `<span class="bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">✓ ደርሷል</span>`;
+            if (status === 'ACK') return `<span class="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">እየተሰራ</span>`;
+            return `<span class="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">አዲስ</span>`;
+        }
+
+        function customerAddMoreItems() {
+            window.scrollTo({ top: 300, behavior: 'smooth' });
+        }
+
+        function scrollToBill() {
+            document.getElementById('active-bill-card').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Send Waiter Call to Cashier
+        function sendWaiterCall(reason) {
+            closeWaiterCallModal();
+            const call = {
+                id: 'CALL-' + Date.now(),
+                tableNum: currentTableNum,
+                reason: reason,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            smartCafeState.waiterCalls.push(call);
+            playChimeSound('new');
+            pushStateToFirebase();
+            alert(currentLang === 'am' ? "ጥሪዎ ለአስተናጋጁ ደርሷል! በአጭር ጊዜ ይመጣሉ።" : "Waiter notified! Someone will arrive shortly.");
+        }
+
+        // ------------------------------------------------------------------
+        // 10. KITCHEN (TABLET 1) & BARISTA (TABLET 2) KDS LOGIC
+        // ------------------------------------------------------------------
+        function renderKitchenKDS() {
+            const grid = document.getElementById('kitchen-orders-grid');
+            if (!grid) return;
+
+            const activeOrders = Object.values(smartCafeState.orders).filter(o => o.status === 'Active');
+            
+            // Filter food category items that are cashier approved
+            const kitchenList = [];
+            activeOrders.forEach(ord => {
+                const foodItems = ord.items.filter(i => i.category === 'food' && i.approvedByCashier);
+                if (foodItems.length > 0) {
+                    kitchenList.push({ ...ord, foodItems });
+                }
+            });
+
+            document.getElementById('kitchen-pending-badge').innerText = `${kitchenList.length} የሚሰሩ ምግቦች`;
+
+            if (kitchenList.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400 font-bold bg-white rounded-2xl border border-dashed">${currentLang === 'am' ? 'ምንም የሚሰራ ምግብ የለም።' : 'No active food orders.'}</div>`;
+                return;
+            }
+
+            grid.innerHTML = kitchenList.map(ord => {
+                const hasNew = ord.foodItems.some(i => i.itemStatus === 'NEW');
+                return `
+                    <div class="bg-white rounded-2xl p-5 shadow-md border-2 ${hasNew ? 'border-red-500 flash-new' : 'border-gray-200'} space-y-4">
+                        <div class="flex justify-between items-center border-b pb-3">
+                            <div>
+                                <h4 class="text-lg font-black text-brand-900">ጠረጴዛ / Table ${ord.tableNum}</h4>
+                                <span class="text-xs text-gray-400">#${ord.orderId} | ${ord.createdAt}</span>
+                            </div>
+                            ${hasNew ? `<span class="bg-red-600 text-white text-xs font-black px-2.5 py-1 rounded-full animate-bounce">አዲስ / NEW</span>` : ''}
+                        </div>
+
+                        ${ord.note ? `<div class="bg-amber-50 border border-amber-200 p-2 rounded-xl text-xs font-bold text-amber-900">📝 ${ord.note}</div>` : ''}
+
+                        <div class="space-y-2">
+                            ${ord.foodItems.map(item => `
+                                <div class="flex items-center justify-between bg-gray-50 p-2.5 rounded-xl border">
+                                    <div>
+                                        <h5 class="text-sm font-extrabold text-gray-800">${currentLang === 'am' ? item.nameAm : item.nameEn}</h5>
+                                        <span class="text-xs font-black text-brand-700">ብዛት: ${item.qty}</span>
+                                    </div>
+                                    <div>
+                                        ${item.itemStatus === 'READY' 
+                                            ? `<span class="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-xl">✓ ደርሷል</span>`
+                                            : `<button onclick="updateItemStatus('${ord.orderId}', ${item.id}, 'READY')" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow transition">
+                                                ${currentLang === 'am' ? 'ደርሷል (Mark Ready)' : 'Mark Ready'}
+                                               </button>`
+                                        }
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        ${hasNew ? `
+                            <button onclick="acknowledgeOrder('${ord.orderId}', 'food')" class="w-full bg-red-600 text-white font-extrabold py-2.5 rounded-xl text-xs shadow hover:bg-red-700 transition">
+                                አይቻለሁ (Acknowledge New Food)
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderBaristaKDS() {
+            const grid = document.getElementById('barista-orders-grid');
+            if (!grid) return;
+
+            const activeOrders = Object.values(smartCafeState.orders).filter(o => o.status === 'Active');
+            
+            // Filter drink category items that are cashier approved
+            const baristaList = [];
+            activeOrders.forEach(ord => {
+                const drinkItems = ord.items.filter(i => (i.category === 'hot' || i.category === 'juice' || i.category === 'soft') && i.approvedByCashier);
+                if (drinkItems.length > 0) {
+                    baristaList.push({ ...ord, drinkItems });
+                }
+            });
+
+            document.getElementById('barista-pending-badge').innerText = `${baristaList.length} የሚሰሩ መጠጦች`;
+
+            if (baristaList.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400 font-bold bg-white rounded-2xl border border-dashed">${currentLang === 'am' ? 'ምንም የሚሰራ መጠጥ የለም።' : 'No active drink orders.'}</div>`;
+                return;
+            }
+
+            grid.innerHTML = baristaList.map(ord => {
+                const hasNew = ord.drinkItems.some(i => i.itemStatus === 'NEW');
+                return `
+                    <div class="bg-white rounded-2xl p-5 shadow-md border-2 ${hasNew ? 'border-amber-500 flash-new' : 'border-gray-200'} space-y-4">
+                        <div class="flex justify-between items-center border-b pb-3">
+                            <div>
+                                <h4 class="text-lg font-black text-brand-900">ጠረጴዛ / Table ${ord.tableNum}</h4>
+                                <span class="text-xs text-gray-400">#${ord.orderId} | ${ord.createdAt}</span>
+                            </div>
+                            ${hasNew ? `<span class="bg-amber-600 text-white text-xs font-black px-2.5 py-1 rounded-full animate-bounce">አዲስ / NEW</span>` : ''}
+                        </div>
+
+                        ${ord.note ? `<div class="bg-amber-50 border border-amber-200 p-2 rounded-xl text-xs font-bold text-amber-900">📝 ${ord.note}</div>` : ''}
+
+                        <div class="space-y-2">
+                            ${ord.drinkItems.map(item => `
+                                <div class="flex items-center justify-between bg-gray-50 p-2.5 rounded-xl border">
+                                    <div>
+                                        <h5 class="text-sm font-extrabold text-gray-800">${currentLang === 'am' ? item.nameAm : item.nameEn}</h5>
+                                        <span class="text-xs font-black text-brand-700">ብዛት: ${item.qty}</span>
+                                    </div>
+                                    <div>
+                                        ${item.itemStatus === 'READY' 
+                                            ? `<span class="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-xl">✓ ደርሷል</span>`
+                                            : `<button onclick="updateItemStatus('${ord.orderId}', ${item.id}, 'READY')" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow transition">
+                                                ${currentLang === 'am' ? 'ደርሷል (Mark Ready)' : 'Mark Ready'}
+                                               </button>`
+                                        }
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        ${hasNew ? `
+                            <button onclick="acknowledgeOrder('${ord.orderId}', 'drink')" class="w-full bg-amber-600 text-white font-extrabold py-2.5 rounded-xl text-xs shadow hover:bg-amber-700 transition">
+                                አይቻለሁ (Acknowledge New Drink)
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function acknowledgeOrder(orderId, catType) {
+            const ord = smartCafeState.orders[orderId];
+            if (!ord) return;
+            ord.items.forEach(i => {
+                if (i.itemStatus === 'NEW') {
+                    if (catType === 'food' && i.category === 'food') i.itemStatus = 'ACK';
+                    if (catType === 'drink' && i.category !== 'food') i.itemStatus = 'ACK';
+                }
+            });
+            pushStateToFirebase();
+        }
+
+        function updateItemStatus(orderId, itemId, newStatus) {
+            const ord = smartCafeState.orders[orderId];
+            if (!ord) return;
+            const item = ord.items.find(i => i.id === itemId);
+            if (item) {
+                item.itemStatus = newStatus;
+                
+                // If item is ready, trigger ready alert to Cashier
+                if (newStatus === 'READY') {
+                    smartCafeState.alerts.push({
+                        id: 'ALT-' + Date.now(),
+                        tableNum: ord.tableNum,
+                        itemName: currentLang === 'am' ? item.nameAm : item.nameEn,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    });
+                    playChimeSound('ready');
+                }
+                pushStateToFirebase();
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // 11. CASHIER POS (TABLET 3) & FEEDS
+        // ------------------------------------------------------------------
+        function renderCashierFeeds() {
+            // Ready alerts list
+            const readyContainer = document.getElementById('ready-alerts-list');
+            if (readyContainer) {
+                if (smartCafeState.alerts.length === 0) {
+                    readyContainer.innerHTML = `<p class="text-xs text-gray-400 py-2">ምንም አዲስ የደረሰ ትዕዛዝ የለም።</p>`;
+                } else {
+                    readyContainer.innerHTML = smartCafeState.alerts.map((alt, idx) => `
+                        <div class="flex items-center justify-between bg-white p-2 rounded-xl border border-emerald-200 text-xs">
+                            <span class="font-extrabold text-brand-900">ጠረጴዛ ${alt.tableNum}፦ ${alt.itemName} (${alt.time})</span>
+                            <button onclick="dismissAlert(${idx})" class="text-xs text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 rounded-md font-bold">
+                                አይቻለሁ
+                            </button>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Waiter calls list
+            const waiterContainer = document.getElementById('waiter-calls-list');
+            if (waiterContainer) {
+                if (smartCafeState.waiterCalls.length === 0) {
+                    waiterContainer.innerHTML = `<p class="text-xs text-gray-400 py-2">ምንም ጥሪ የለም።</p>`;
+                } else {
+                    waiterContainer.innerHTML = smartCafeState.waiterCalls.map((call, idx) => `
+                        <div class="flex items-center justify-between bg-white p-2 rounded-xl border border-rose-200 text-xs">
+                            <span class="font-extrabold text-rose-900">ጠረጴዛ ${call.tableNum}፦ ${call.reason} (${call.time})</span>
+                            <button onclick="dismissWaiterCall(${idx})" class="text-xs text-rose-700 bg-rose-100 hover:bg-rose-200 px-2 py-0.5 rounded-md font-bold">
+                                ተስተናግዷል
+                            </button>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function dismissAlert(idx) {
+            smartCafeState.alerts.splice(idx, 1);
+            pushStateToFirebase();
+        }
+
+        function dismissWaiterCall(idx) {
+            smartCafeState.waiterCalls.splice(idx, 1);
+            pushStateToFirebase();
+        }
+
+        function renderCashierTablesGrid() {
+            const grid = document.getElementById('cashier-tables-grid');
+            if (!grid) return;
+
+            let html = '';
+            for (let t = 1; t <= 10; t++) {
+                const activeOrd = getActiveOrderByTable(t);
+                
+                if (!activeOrd) {
+                    html += `
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 space-y-3 flex flex-col justify-between">
+                            <div class="flex justify-between items-center">
+                                <h4 class="text-base font-black text-gray-700">ጠረጴዛ ${t}</h4>
+                                <span class="bg-gray-100 text-gray-600 text-[10px] font-extrabold px-2 py-0.5 rounded-full">ነፃ / Free</span>
+                            </div>
+                            <p class="text-xs text-gray-400">ምንም ንቁ ሂሳብ የለም።</p>
+                        </div>
+                    `;
+                } else {
+                    const subtotal = activeOrd.items.reduce((s, i) => s + (i.price * i.qty), 0);
+                    const total = subtotal + activeOrd.tip;
+                    const hasAddonPending = activeOrd.addonPending;
+
+                    html += `
+                        <div class="bg-white p-4 rounded-2xl shadow-md border-2 ${hasAddonPending ? 'border-purple-500 flash-new' : 'border-brand-500'} space-y-3 flex flex-col justify-between">
+                            <div class="flex justify-between items-center border-b pb-2">
+                                <h4 class="text-base font-black text-brand-900">ጠረጴዛ ${t}</h4>
+                                <span class="bg-amber-400 text-brand-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                                    ${activeOrd.type === 'Walk-in' ? 'Walk-in' : 'QR Scan'}
+                                </span>
+                            </div>
+
+                            <div class="text-xs space-y-1">
+                                <p class="text-gray-500 font-bold">ብዛት: ${activeOrd.items.length} ምግቦች</p>
+                                <p class="text-sm font-black text-brand-700">ጠቅላላ: ${total} ETB</p>
+                            </div>
+
+                            ${hasAddonPending ? `
+                                <button onclick="confirmCashierAddon('${activeOrd.orderId}')" class="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold py-2 rounded-xl shadow transition">
+                                    ለአዲስ ትዕዛዝ ማረጋገጫ ይስጡ (Confirm Add-on)
+                                </button>
+                            ` : ''}
+
+                            <button onclick="confirmCashPaid('${activeOrd.orderId}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold py-2.5 rounded-xl shadow transition flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-check"></i>
+                                <span>ካሽ ተቀብያለሁ (Confirm Paid)</span>
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+            grid.innerHTML = html;
+        }
+
+        // Cashier Confirms Add-on Items
+        function confirmCashierAddon(orderId) {
+            const ord = smartCafeState.orders[orderId];
+            if (!ord) return;
+
+            ord.addonPending = false;
+            ord.items.forEach(i => {
+                i.approvedByCashier = true; // Route to KDS
+            });
+
+            playChimeSound('new');
+            pushStateToFirebase();
+        }
+
+        // Cashier Confirms Payment Closed
+        function confirmCashPaid(orderId) {
+            const ord = smartCafeState.orders[orderId];
+            if (!ord) return;
+
+            ord.status = 'Paid';
+            ord.paidAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            // Log to End of Day report
+            smartCafeState.eodLog.push({ ...ord });
+
+            pushStateToFirebase();
+            alert(currentLang === 'am' ? "ክፍያው በተካሄደ ተመዝግቧል! ጠረጴዛው ነፃ ሆኗል።" : "Payment confirmed! Table is now free.");
+        }
+
+        // ------------------------------------------------------------------
+        // 12. MANUAL WALKIN POS BUILDER
+        // ------------------------------------------------------------------
+        let walkinCart = [];
+
+        function renderWalkinMenuPicker() {
+            const picker = document.getElementById('pos-menu-picker');
+            if (!picker) return;
+
+            picker.innerHTML = menuItems.map(item => `
+                <div onclick="addWalkinItem(${item.id})" class="bg-gray-50 border p-2.5 rounded-xl cursor-pointer hover:bg-emerald-50 hover:border-brand-500 transition text-xs space-y-1">
+                    <h5 class="font-bold text-gray-800">${currentLang === 'am' ? item.nameAm : item.nameEn}</h5>
+                    <div class="flex justify-between font-black text-brand-700">
+                        <span>${item.price} ETB</span>
+                        <span class="text-brand-600">+ ጨምር</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addWalkinItem(itemId) {
+            const item = menuItems.find(m => m.id === itemId);
+            if (!item) return;
+
+            const existing = walkinCart.find(w => w.id === itemId);
+            if (existing) {
+                existing.qty++;
+            } else {
+                walkinCart.push({ ...item, qty: 1 });
+            }
+            renderWalkinCart();
+        }
+
+        function renderWalkinCart() {
+            const list = document.getElementById('pos-cart-items');
+            const totalVal = walkinCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+            if (walkinCart.length === 0) {
+                list.innerHTML = `<p class="text-xs text-gray-400 text-center py-6">ምንም አልተመረጠም።</p>`;
+            } else {
+                list.innerHTML = walkinCart.map(item => `
+                    <div class="flex items-center justify-between text-xs bg-white p-2 rounded-xl border">
+                        <div>
+                            <h5 class="font-bold text-gray-800">${currentLang === 'am' ? item.nameAm : item.nameEn}</h5>
+                            <span class="text-gray-400">${item.price} ETB × ${item.qty}</span>
+                        </div>
+                        <span class="font-black text-brand-700">${item.price * item.qty} ETB</span>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('pos-cart-total').innerText = `${totalVal} ETB`;
+        }
+
+        function submitWalkinOrder() {
+            if (walkinCart.length === 0) {
+                alert(currentLang === 'am' ? "እባክዎን ከዝርዝሩ ላይ ምግብ ይምረጡ!" : "Please select items!");
+                return;
+            }
+
+            const tableSelect = document.getElementById('pos-table-select').value;
+            const orderId = 'WALK-' + Date.now().toString().slice(-6);
+
+            const newOrder = {
+                orderId: orderId,
+                tableNum: tableSelect,
+                type: 'Walk-in',
+                status: 'Active',
+                createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                note: '[ከስካን ውጪ / Walk-in POS]',
+                tip: 0,
+                items: walkinCart.map(item => ({
+                    id: item.id,
+                    nameAm: item.nameAm,
+                    nameEn: item.nameEn,
+                    price: item.price,
+                    qty: item.qty,
+                    category: item.category,
+                    itemStatus: 'NEW',
+                    approvedByCashier: true
+                }))
+            };
+
+            smartCafeState.orders[orderId] = newOrder;
+            walkinCart = [];
+            renderWalkinCart();
+            playChimeSound('new');
+            pushStateToFirebase();
+            switchCashierSubTab('tables');
+        }
+
+        // ------------------------------------------------------------------
+        // 13. END OF DAY (EOD) REPORT & MS WORD (.DOC) EXPORTER
+        // ------------------------------------------------------------------
+        function renderEODReport() {
+            const logs = smartCafeState.eodLog || [];
+
+            let totalRev = 0;
+            let qrRev = 0;
+            let walkinRev = 0;
+            let qrCount = 0;
+            let walkinCount = 0;
+
+            const bestSellerMap = {}; // itemId -> { name, qty, rev, cat }
+
+            logs.forEach(ord => {
+                const subtotal = ord.items.reduce((s, i) => s + (i.price * i.qty), 0);
+                const orderTotal = subtotal + (ord.tip || 0);
+
+                totalRev += orderTotal;
+
+                if (ord.type === 'Walk-in') {
+                    walkinRev += orderTotal;
+                    walkinCount++;
+                } else {
+                    qrRev += orderTotal;
+                    qrCount++;
+                }
+
+                ord.items.forEach(i => {
+                    if (!bestSellerMap[i.id]) {
+                        bestSellerMap[i.id] = {
+                            name: currentLang === 'am' ? i.nameAm : i.nameEn,
+                            qty: 0,
+                            rev: 0
+                        };
+                    }
+                    bestSellerMap[i.id].qty += i.qty;
+                    bestSellerMap[i.id].rev += (i.price * i.qty);
+                });
+            });
+
+            document.getElementById('stat-total-revenue').innerText = `${totalRev} ETB`;
+            document.getElementById('stat-total-orders').innerText = logs.length;
+            document.getElementById('stat-qr-revenue').innerText = `${qrRev} ETB`;
+            document.getElementById('stat-qr-count').innerText = `${qrCount} ትዕዛዞች`;
+            document.getElementById('stat-walkin-revenue').innerText = `${walkinRev} ETB`;
+            document.getElementById('stat-walkin-count').innerText = `${walkinCount} ትዕዛዞች`;
+
+            // Ranked Best Sellers
+            const bestSellers = Object.values(bestSellerMap).sort((a, b) => b.qty - a.qty);
+            const bestTable = document.getElementById('bestsellers-table-body');
+            if (bestTable) {
+                if (bestSellers.length === 0) {
+                    bestTable.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-400">ምንም መረጃ የለም።</td></tr>`;
+                } else {
+                    bestTable.innerHTML = bestSellers.map((bs, idx) => `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-2 font-bold text-brand-700">#${idx + 1}</td>
+                            <td class="p-2 font-semibold text-gray-800">${bs.name}</td>
+                            <td class="p-2 text-center font-bold">${bs.qty}</td>
+                            <td class="p-2 text-right font-black text-brand-900">${bs.rev} ETB</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+
+            // Detailed Transaction Logs
+            const transTable = document.getElementById('transactions-table-body');
+            if (transTable) {
+                if (logs.length === 0) {
+                    transTable.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-400">ምንም የተጠናቀቀ ትዕዛዝ የለም።</td></tr>`;
+                } else {
+                    transTable.innerHTML = logs.map(ord => {
+                        const subtotal = ord.items.reduce((s, i) => s + (i.price * i.qty), 0);
+                        const total = subtotal + ord.tip;
+                        const itemListStr = ord.items.map(i => `${i.nameAm} (${i.qty})`).join(', ');
+
+                        return `
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="p-2 font-semibold text-gray-500">${ord.paidAt || ord.createdAt}</td>
+                                <td class="p-2 font-bold text-gray-800">ጠረጴዛ ${ord.tableNum}</td>
+                                <td class="p-2"><span class="text-[10px] font-black px-2 py-0.5 rounded-full ${ord.type === 'Walk-in' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">${ord.type}</span></td>
+                                <td class="p-2 text-gray-600 max-w-xs truncate">${itemListStr}</td>
+                                <td class="p-2 text-right font-black text-brand-700">${total} ETB</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+        }
+
+        // Export EOD Sales Report to Microsoft Word (.doc)
+        function downloadWordReport() {
+            const logs = smartCafeState.eodLog || [];
+            let totalRev = 0;
+            let qrRev = 0;
+            let walkinRev = 0;
+
+            logs.forEach(ord => {
+                const subtotal = ord.items.reduce((s, i) => s + (i.price * i.qty), 0);
+                const orderTotal = subtotal + (ord.tip || 0);
+                totalRev += orderTotal;
+                if (ord.type === 'Walk-in') walkinRev += orderTotal;
+                else qrRev += orderTotal;
+            });
+
+            const dateStr = new Date().toLocaleDateString('am-ET', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            let docHTML = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset='utf-8'><title>Smart Cafe EOD Report</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
+                    h1 { color: #0d9488; text-align: center; }
+                    .summary-box { background-color: #f0fdf4; border: 1px solid #14b8a6; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 12px; }
+                    th { background-color: #064e3b; color: #ffffff; }
+                </style>
+                </head>
+                <body>
+                    <h1>Smart Cafe - የዕለቱ የሽያጭ ሪፖርት (End of Day Report)</h1>
+                    <p style="text-align:center;">ቀን: <strong>${dateStr}</strong></p>
+
+                    <div class="summary-box">
+                        <h3>የገቢ ማጠቃለያ Summary</h3>
+                        <p>ጠቅላላ የተሰበሰበ ገቢ (Total Revenue): <strong>${totalRev} ETB</strong></p>
+                        <p>በ QR ስካን የተሰበሰበ (QR Scan Sales): <strong>${qrRev} ETB</strong></p>
+                        <p>ከስካን ውጪ በ Walk-in የተሰበሰበ (Walk-in Sales): <strong>${walkinRev} ETB</strong></p>
+                        <p>ጠቅላላ የተጠናቀቁ ትዕዛዞች: <strong>${logs.length}</strong></p>
+                    </div>
+
+                    <h3>የተጠናቀቁ ትዕዛዞች ዝርዝር (Transaction Log)</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ጊዜ</th>
+                                <th>ጠረጴዛ</th>
+                                <th>ዓይነት</th>
+                                <th>የታዘዙ ምግቦች</th>
+                                <th>ጠቅላላ ሂሳብ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logs.map(ord => {
+                                const subtotal = ord.items.reduce((s, i) => s + (i.price * i.qty), 0);
+                                const total = subtotal + ord.tip;
+                                const itemsStr = ord.items.map(i => `${i.nameAm} x${i.qty}`).join(', ');
+                                return `
+                                    <tr>
+                                        <td>${ord.paidAt || ord.createdAt}</td>
+                                        <td>ጠረጴዛ ${ord.tableNum}</td>
+                                        <td>${ord.type}</td>
+                                        <td>${itemsStr}</td>
+                                        <td>${total} ETB</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob(['\ufeff' + docHTML], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Smart_Cafe_EOD_Report_${Date.now()}.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
