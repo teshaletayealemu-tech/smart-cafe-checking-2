@@ -1998,7 +1998,7 @@ function renderStationKDS(station) {
   const seenKey = station === 'kitchen' ? 'seenKitchen' : 'seenBarista';
   const currentSub = stationSubViews[station] || 'active';
 
-  const recent24hOrders = getLast24HoursOrders();
+  const recent24hOrders = getLast24HoursOrders().filter(o => o.table !== '🛵 Delivery' || !o.paymentStatus || o.paymentStatus === 'verified');
   const stationOrders = recent24hOrders.filter(o => o.items.some(i => i.cat === catFilter));
 
   const activeStationOrders = stationOrders.filter(o =>
@@ -2812,16 +2812,20 @@ function renderAllViews() {
 }
 
 
-function submitDeliveryOrder() {
+async function submitDeliveryOrder() {
   const name = document.getElementById('deliv-name').value.trim();
   const phone = document.getElementById('deliv-phone').value.trim();
   const address = document.getElementById('deliv-address').value.trim();
   const extra = document.getElementById('deliv-items').value.trim();
   const picked = Object.entries(delivCart).filter(([, q]) => q > 0);
+  const shotFile = document.getElementById('deliv-screenshot').files[0];
   if (!name || !phone || (!address && !delivLoc) || (!picked.length && !extra)) {
     showToast('እባክዎ ስም፣ ስልክ፣ አድራሻ (ወይም ቦታ) እና ትዕዛዝ ይሙሉ!');
     return;
   }
+  if (!shotFile) { showToast('🧾 እባክዎ የክፍያ ማረጋገጫ ፎቶ (Screenshot) ያያይዙ!'); return; }
+  let proofImg;
+  try { proofImg = await compressImageFile(shotFile, 900, 0.7); } catch (e) { showToast('⚠️ ፎቶውን መጫን አልተቻለም፤ ሌላ ፎቶ ይሞክሩ'); return; }
   const items = picked.map(([id, q]) => { const m = MENU_ITEMS.find(x => x.id === id); return { uid: `dl_${id}_${Date.now()}`, am: m.am, price: m.price, qty: q, ready: false, cat: m.cat }; });
   if (extra) items.push({ uid: `dx_${Date.now()}`, am: `✍️ ${extra}`, price: 0, qty: 1, ready: false, cat: 'food' });
   items.push({ uid: `dfee_${Date.now()}`, am: '🛵 ዲሊቨሪ ክፍያ', price: getDeliveryFee(), qty: 1, ready: true, cat: 'service' });
@@ -2829,19 +2833,24 @@ function submitDeliveryOrder() {
   const id = `DELIV-${Math.floor(1000 + Math.random() * 9000)}`;
   const order = {
     id, table: '🛵 Delivery', guestCount: 1, source: 'Home Delivery (0945450793)', status: 'active',
-    deliveryStatus: 'new', driver: '', phone, mapUrl, items, pendingItems: [], tip: 0,
+    deliveryStatus: 'new', paymentStatus: 'pending', hasProof: true, driver: '', phone, mapUrl, items, pendingItems: [], tip: 0,
     total: items.reduce((a, i) => a + i.price * i.qty, 0),
     note: `አድራሻ: ${address || 'በካርታ'} | ስልክ: ${phone} | ስም: ${name}`,
     seenKitchen: false, seenBarista: false, createdAt: nowTime(), createdTs: Date.now()
   };
+  try {
+    if (db) await db.ref('payment_proofs/' + id).set({ img: proofImg, ts: Date.now(), phone });
+    else localStorage.setItem('rv_proof_' + id, proofImg);
+  } catch (e) { console.error(e); showToast('⚠️ የክፍያ ፎቶ መላክ አልተሳካም፤ እንደገና ይሞክሩ'); return; }
   sharedState.orders.unshift(order);
-  sharedState.alerts.unshift({ id: `deliv_alt_${Date.now()}`, channel: 'customer', text: `🛵 አዲስ ዲሊቨሪ ${id} (${name} - ${phone}): ${items.filter(i => i.cat !== 'service').map(i => i.qty + 'x ' + i.am).join('، ')} [${address || 'ካርታ'}]`, seen: false, ts: Date.now(), time: nowTime() });
+  sharedState.alerts.unshift({ id: `deliv_alt_${Date.now()}`, channel: 'customer', text: `🛵 አዲስ ዲሊቨሪ ${id} (${name} - ${phone}): ${items.filter(i => i.cat !== 'service').map(i => i.qty + 'x ' + i.am).join('، ')} [${address || 'ካርታ'}] 🧾 የክፍያ ማረጋገጫ ተያይዟል — እባክዎ ያረጋግጡ`, seen: false, ts: Date.now(), time: nowTime() });
   localStorage.setItem('riverside_my_delivery', id);
   delivCart = {}; delivLoc = null;
   saveSharedState();
   toggleModal('modal-delivery', false);
   ['deliv-name', 'deliv-phone', 'deliv-address', 'deliv-items'].forEach(i => document.getElementById(i).value = '');
   document.getElementById('deliv-loc-status').textContent = '';
+  document.getElementById('deliv-screenshot').value = '';
   showToast(`🛵 ትዕዛዝዎ ${id} ተልኳል! ሁኔታውን ከታች መከታተል ይችላሉ።`);
 }
 
@@ -3037,7 +3046,7 @@ function renderTracker() {
   else { steps = ['ተቀብለናል', 'እየተዘጋጀ', 'ተዘጋጅቷል', 'ተከፍሏል']; step = order.status === 'paid' ? 3 : (items.length && done === items.length ? 2 : (done > 0 || order.seenKitchen || order.seenBarista ? 1 : 0)); }
   box.classList.remove('hidden');
   box.innerHTML = `<p class="text-sm font-extrabold text-emerald-950 mb-3">${isDel ? '🛵 የዲሊቨሪ ትዕዛዝዎ' : '🍽️ የትዕዛዝዎ ሁኔታ'} <span class="text-xs font-bold text-emerald-700">(${done}/${items.length} ተዘጋጅቷል)</span></p>
-    ${isDel && (order.driver || order.driverPhone) ? `<div class="mb-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs font-bold text-emerald-950">🛵 ሹፌር: ${escHtml(order.driver || '')} ${order.driverPhone ? `<a href="tel:${escHtml(order.driverPhone)}" class="ml-2 underline text-emerald-800">📞 ${escHtml(order.driverPhone)}</a>` : ''}</div>` : ''}
+    ${isDel && order.paymentStatus && order.paymentStatus !== 'verified' ? `<div class="mb-3 p-2.5 rounded-xl text-xs font-bold ${order.paymentStatus === 'rejected' ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-amber-50 text-amber-900 border border-amber-200'}">${order.paymentStatus === 'rejected' ? '❌ ክፍያዎ አልተረጋገጠም። እባክዎ በ 0945450793 ይደውሉ።' : '⏳ ክፍያዎ እየተረጋገጠ ነው፤ ከተረጋገጠ በኋላ ዝግጅት ይጀምራል።'}</div>` : ''}${isDel && (order.driver || order.driverPhone) ? `<div class="mb-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs font-bold text-emerald-950">🛵 ሹፌር: ${escHtml(order.driver || '')} ${order.driverPhone ? `<a href="tel:${escHtml(order.driverPhone)}" class="ml-2 underline text-emerald-800">📞 ${escHtml(order.driverPhone)}</a>` : ''}</div>` : ''}
     <div class="flex items-start">${steps.map((t, i) => `<div class="flex-1 text-center"><div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-sm font-black ${i <= step ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-500'} ${i === step ? 'ring-4 ring-emerald-200' : ''}">${i < step ? '✓' : i + 1}</div><p class="text-[10px] font-bold mt-1 ${i <= step ? 'text-emerald-900' : 'text-gray-400'}">${t}</p></div>`).join('')}</div>`;
 }
 
@@ -3081,6 +3090,12 @@ function renderDeliveryPanel() {
       <div class="flex justify-between font-extrabold"><span>${o.id} • ${lab[ds]}</span><span>${tot} ETB</span></div>
       <p>${(o.items || []).map(i => `${i.qty}x ${escHtml(i.am)}`).join('، ')}</p>
       <p class="text-gray-600">${escHtml(o.note || '')}</p>
+      ${o.paymentStatus ? `<div class="flex flex-wrap items-center gap-2 p-2 rounded-lg ${o.paymentStatus === 'verified' ? 'bg-emerald-100' : o.paymentStatus === 'rejected' ? 'bg-red-100' : 'bg-amber-100'}">
+        <span class="font-extrabold">${o.paymentStatus === 'verified' ? '✅ ክፍያ ተረጋግጧል' : o.paymentStatus === 'rejected' ? '❌ ክፍያ አልተረጋገጠም' : '⏳ ክፍያ ማረጋገጫ ይጠብቃል'}</span>
+        <button onclick="viewProof('${o.id}')" class="font-extrabold underline text-emerald-900">🧾 ፎቶ ተመልከት</button>
+        ${o.paymentStatus !== 'verified' ? `<button onclick="setPaymentStatus('${o.id}','verified')" class="bg-emerald-700 text-white font-extrabold px-2.5 py-1 rounded-lg">✅ አረጋግጥ</button>` : ''}
+        ${o.paymentStatus === 'pending' ? `<button onclick="setPaymentStatus('${o.id}','rejected')" class="bg-red-600 text-white font-extrabold px-2.5 py-1 rounded-lg">❌ አልደረሰም</button>` : ''}
+      </div>` : ''}
       <div class="flex flex-wrap items-center gap-2">
         ${o.phone ? `<a href="tel:${escHtml(o.phone)}" class="font-bold text-emerald-800 underline">📞 ${escHtml(o.phone)}</a>` : ''}
         ${o.mapUrl ? `<a href="${o.mapUrl}" target="_blank" rel="noopener" class="font-bold text-emerald-800 underline">📍 ካርታ</a>` : ''}
@@ -3091,8 +3106,27 @@ function renderDeliveryPanel() {
 }
 function setDeliveryDriver(id, v) { const o = sharedState.orders.find(x => x.id === id); if (o) { o.driver = v; saveSharedState(); } }
 function setDeliveryDriverPhone(id, v) { const o = sharedState.orders.find(x => x.id === id); if (o) { o.driverPhone = v.trim(); saveSharedState(); } }
+const proofCache = {};
+async function viewProof(id) {
+  let img = proofCache[id];
+  try {
+    if (!img) { img = db ? (await db.ref('payment_proofs/' + id).once('value')).val()?.img : localStorage.getItem('rv_proof_' + id); if (img) proofCache[id] = img; }
+  } catch (e) { console.error(e); }
+  if (!img) { showToast('⚠️ ፎቶው አልተገኘም (ፈቃድ ወይም ኢንተርኔት ያረጋግጡ)'); return; }
+  const ov = document.createElement('div');
+  ov.className = 'fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4';
+  ov.onclick = () => ov.remove();
+  ov.innerHTML = `<img src="${img}" class="max-h-full max-w-full rounded-xl" />`;
+  document.body.appendChild(ov);
+}
+function setPaymentStatus(id, st) {
+  const o = sharedState.orders.find(x => x.id === id); if (!o) return;
+  o.paymentStatus = st; saveSharedState();
+  showToast(st === 'verified' ? '✅ ክፍያ ተረጋግጧል፤ ትዕዛዙ ወደ ኪችን/ባሬስታ ተልኳል' : '❌ ክፍያ እንዳልደረሰ ተመዝግቧል');
+}
 function advanceDelivery(id, st) {
   const o = sharedState.orders.find(x => x.id === id); if (!o) return;
+  if (o.paymentStatus && o.paymentStatus !== 'verified') { showToast('⚠️ መጀመሪያ ክፍያውን ያረጋግጡ'); return; }
   o.deliveryStatus = st;
   if (st === 'delivered') { o.total = calculateOrderTotals(o).confirmedTotal; o.status = 'paid'; o.paidAt = nowTime(); }
   saveSharedState();
