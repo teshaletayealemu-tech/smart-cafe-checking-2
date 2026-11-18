@@ -1115,10 +1115,15 @@ function saveSharedState() {
 
   localStorage.setItem('riverside_cafe_shared_v1', JSON.stringify(payload));
   if (dbRef) {
-    const out = isStaffUser(authUser)
-      ? { orders: payload.orders, alerts: payload.alerts, ratings: payload.ratings, hiddenItemIds: payload.hiddenItemIds, houseSpecial: payload.houseSpecial, itemImages: payload.itemImages, deliveryFee: payload.deliveryFee, extraPrices: payload.extraPrices, lastUpdated: payload.lastUpdated }
-      : { orders: payload.orders, alerts: payload.alerts, ratings: payload.ratings, lastUpdated: payload.lastUpdated };
-    dbRef.update(out).catch(err => console.error("Firebase write error:", err));
+    if (isAnyStaff()) {
+      const out = isStaffUser(authUser)
+        ? { orders: payload.orders, alerts: payload.alerts, ratings: payload.ratings, hiddenItemIds: payload.hiddenItemIds, houseSpecial: payload.houseSpecial, itemImages: payload.itemImages, deliveryFee: payload.deliveryFee, extraPrices: payload.extraPrices, lastUpdated: payload.lastUpdated }
+        : { orders: payload.orders, alerts: payload.alerts, ratings: payload.ratings, lastUpdated: payload.lastUpdated };
+      dbRef.update(out).catch(err => console.error("Firebase write error:", err));
+      publishMirrors();
+    } else {
+      customerFlush();
+    }
   }
   renderAllViews();
 }
@@ -1184,6 +1189,151 @@ function handleIncomingState(data) {
   if (activeModalTableNum !== null && !document.getElementById('modal-table-detail').classList.contains('hidden')) {
     openCashierTableModal(activeModalTableNum);
   }
+  if (syncMode === 'staff') publishMirrors();
+}
+
+// ==================== SYNC ENGINE: ደንበኛ ምንም የንግድ ዳታ አያወርድም ====================
+let syncMode = null, syncOffs = [], pubCache = {};
+const outbox = { alerts: new Set(), orders: new Set(), pend: {}, pendTip: {}, rating: {} };
+const mirrorSeen = new Set();
+let watchedTable = null, tableRef = null, tableCb = null, watchedDel = null, delRef = null, delCb = null;
+function isAnyStaff() { return !!emailRole(authUser); }
+function stopSync() { syncOffs.forEach(f => { try { f(); } catch (e) {} }); syncOffs = []; watchedTable = null; watchedDel = null; }
+function startSync() {
+  if (!dbRef) return;
+  const mode = isAnyStaff() ? 'staff' : 'customer';
+  if (syncMode === mode) return;
+  stopSync(); syncMode = mode; pubCache = {};
+  if (mode === 'staff') startStaffSync(); else startCustomerSync();
+}
+
+// ---- ሰራተኛ: ሙሉ ዳታ + ከደንበኞች የሚመጡ ትዕዛዞችን መቀበል ----
+function startStaffSync() {
+  const cb = s => { if (s.exists()) handleIncomingState(s.val()); };
+  dbRef.on('value', cb); syncOffs.push(() => dbRef.off('value', cb));
+  const t = setInterval(() => dbRef.once('value').then(cb).catch(() => {}), 12000); syncOffs.push(() => clearInterval(t));
+  const inc = db.ref('incoming');
+  const icb = snap => claimIncoming(inc, snap.key);
+  inc.on('child_added', icb, e => console.warn('incoming listen', e)); syncOffs.push(() => inc.off('child_added', icb));
+}
+async function claimIncoming(ref, key) {
+  let claimed = null;
+  try {
+    const res = await ref.child(key).transaction(cur => { claimed = cur; return cur ? null : undefined; });
+    if (res.committed && claimed) processIncoming(claimed);
+  } catch (e) { console.error('claim failed', e); }
+}
+function processIncoming(m) {
+  const d = m.data || {}, S = sharedState;
+  if (!Array.isArray(S.alerts)) S.alerts = normalizeArray(S.alerts);
+  if (!Array.isArray(S.ratings)) S.ratings = normalizeArray(S.ratings);
+  if (m.type === 'alert') { if (!S.alerts.some(a => a.id === d.id)) S.alerts.unshift(d); }
+  else if (m.type === 'rating') { const i = S.ratings.findIndex(r => r.id === d.id); if (i >= 0) S.ratings[i] = d; else S.ratings.unshift(d); }
+  else if (m.type === 'order') {
+    d.items = normalizeArray(d.items); d.pendingItems = normalizeArray(d.pendingItems);
+    if (S.orders.some(o => orderKey(o) === orderKey(d))) return;
+    const ex = d.table === '🛵 Delivery' ? null : getActiveTableOrder(d.table);
+    if (ex) { ex.pendingItems = [...normalizeArray(ex.pendingItems), ...d.items]; ex.pendingTip = (Number(ex.pendingTip) || 0) + Number(d.tip || 0); }
+    else S.orders.unshift(d);
+  } else if (m.type === 'addon') {
+    const o = S.orders.find(x => x.id === d.orderId && x.status !== 'paid') || getActiveTableOrder(d.table);
+    if (o) {
+      o.pendingItems = [...normalizeArray(o.pendingItems), ...normalizeArray(d.pendingItems)];
+      o.pendingTip = (Number(o.pendingTip) || 0) + Number(d.pendingTip || 0);
+      if (d.note && d.note !== (o.note || '')) o.note = (o.note && d.note.startsWith(o.note)) ? d.note : (o.note ? o.note + ' | ' + d.note : d.note);
+    }
+  }
+  saveSharedState();
+}
+
+// ---- ሰራተኛ → ደንበኛ: ለእያንዳንዱ ጠረጴዛ/ዲሊቨሪ ትንሽ "መስታወት" ብቻ ----
+function publishMirrors() {
+  if (!db || !isAnyStaff()) return;
+  const upd = {}, live = new Set();
+  const slim = i => ({ uid: i.uid, id: i.id, am: i.am, price: i.price, qty: i.qty, ready: !!i.ready, cat: i.cat });
+  (sharedState.orders || []).filter(o => o.status !== 'paid').forEach(o => {
+    const isDel = o.table === '🛵 Delivery';
+    const path = isDel ? 'delivery_view/' + o.id : (Number(o.table) ? 'table_view/' + Number(o.table) : null);
+    if (!path || (isDel && o.deliveryStatus === 'delivered')) return;
+    live.add(path);
+    const v = JSON.stringify({ id: o.id, table: o.table, status: o.status, items: (o.items || []).map(slim), pendingItems: (o.pendingItems || []).map(slim), tip: o.tip || 0, pendingTip: o.pendingTip || 0, note: o.note || '', createdTs: o.createdTs, guestCount: o.guestCount || 1, deliveryStatus: o.deliveryStatus || null, paymentStatus: o.paymentStatus || null, driver: o.driver || '', driverPhone: o.driverPhone || '' });
+    if (pubCache[path] !== v) { pubCache[path] = v; upd[path] = JSON.parse(v); }
+  });
+  Object.keys(pubCache).forEach(k => { if (/^(table_view|delivery_view)\//.test(k) && !live.has(k)) { upd[k] = null; delete pubCache[k]; } });
+  (sharedState.alerts || []).forEach(a => { if (a.isCall && a.seen && !pubCache['cs_' + a.id]) { pubCache['cs_' + a.id] = 1; upd['call_status/' + a.id] = true; } });
+  if (isStaffUser(authUser)) {
+    const cfg = JSON.stringify({ hiddenItemIds: sharedState.hiddenItemIds || [], houseSpecial: sharedState.houseSpecial || DEFAULT_HOUSE_SPECIAL, itemImages: sharedState.itemImages || {}, deliveryFee: getDeliveryFee(), extraPrices: sharedState.extraPrices || {} });
+    if (pubCache.cfg !== cfg) { pubCache.cfg = cfg; upd['public_config'] = JSON.parse(cfg); }
+  }
+  if (Object.keys(upd).length) db.ref().update(upd).catch(e => { console.error('publish failed', e); pubCache = {}; });
+}
+
+// ---- ደንበኛ: ሜኑ ቅንብር + የራሱ ጠረጴዛ/ዲሊቨሪ ብቻ ----
+function startCustomerSync() {
+  sharedState.orders = []; sharedState.alerts = []; sharedState.ratings = [];
+  try { localStorage.removeItem('riverside_cafe_shared_v1'); } catch (e) {}
+  const ref = db.ref('public_config');
+  const cb = snap => {
+    const d = snap.val(); if (!d) return;
+    sharedState.hiddenItemIds = normalizeArray(d.hiddenItemIds);
+    if (d.houseSpecial) sharedState.houseSpecial = { ...DEFAULT_HOUSE_SPECIAL, ...d.houseSpecial };
+    sharedState.itemImages = d.itemImages || {};
+    if (d.deliveryFee !== undefined && d.deliveryFee !== null) sharedState.deliveryFee = Number(d.deliveryFee);
+    sharedState.extraPrices = d.extraPrices || {};
+    applyExtraPrices();
+    sharedState.hiddenItemIds.forEach(h => { if (cart[h]) delete cart[h]; });
+    renderAllViews();
+    const sp = sharedState.houseSpecial;
+    if (!hasShownInitialSpecial && currentTab === 'customer' && sp.active && !isItemHidden(sp.itemId) && !getActiveTableOrder(customerTable)) { hasShownInitialSpecial = true; openSpecialPopup(false); }
+  };
+  ref.on('value', cb, e => console.warn('config', e)); syncOffs.push(() => ref.off('value', cb));
+  watchMyTable(); watchMyDelivery();
+}
+function applyMirror(m, matchFn) {
+  const local = sharedState.orders.find(matchFn), keep = sharedState.orders.filter(o => !matchFn(o));
+  if (m) {
+    m.items = normalizeArray(m.items); m.pendingItems = normalizeArray(m.pendingItems);
+    mirrorSeen.add(m.id); outbox.pend[m.id] = m.pendingItems.length; outbox.pendTip[m.id] = Number(m.pendingTip) || 0;
+    sharedState.orders = [...keep, m];
+  } else if (local && !mirrorSeen.has(local.id) && Date.now() - (local.createdTs || 0) < 180000) { /* ገና ወደ ካሸር አልደረሰም፤ የራሱን ቅጂ ያቆያል */ }
+  else sharedState.orders = keep;
+  renderAllViews();
+}
+function watchMyTable() {
+  if (syncMode !== 'customer' || !db) return;
+  const t = customerTable; if (t === watchedTable) return;
+  if (tableRef && tableCb) tableRef.off('value', tableCb);
+  watchedTable = t; tableRef = null;
+  if (t === 'Takeaway' || !Number(t)) return;
+  tableRef = db.ref('table_view/' + Number(t));
+  tableCb = snap => applyMirror(snap.val(), o => o.table !== '🛵 Delivery' && String(o.table) === String(t));
+  tableRef.on('value', tableCb, e => console.warn('table', e));
+  syncOffs.push(() => { if (tableRef && tableCb) tableRef.off('value', tableCb); });
+}
+function watchMyDelivery() {
+  if (syncMode !== 'customer' || !db) return;
+  const id = localStorage.getItem('riverside_my_delivery'); if (!id || id === watchedDel) return;
+  if (delRef && delCb) delRef.off('value', delCb);
+  watchedDel = id; delRef = db.ref('delivery_view/' + id);
+  delCb = snap => applyMirror(snap.val(), o => o.id === id);
+  delRef.on('value', delCb, e => console.warn('delivery', e));
+  syncOffs.push(() => { if (delRef && delCb) delRef.off('value', delCb); });
+}
+// ደንበኛ የሚፈጥረውን ብቻ ወደ "incoming" ይልካል (የሌሎችን ዳታ አይነካም)
+function customerFlush() {
+  const send = (type, data) => db.ref('incoming').push({ type, data: JSON.parse(JSON.stringify(data)), ts: Date.now() }).catch(e => console.error('send failed', e));
+  (sharedState.alerts || []).forEach(a => { if (!outbox.alerts.has(a.id)) { outbox.alerts.add(a.id); send('alert', a); } });
+  (sharedState.ratings || []).forEach(r => { const sig = JSON.stringify(r); if (outbox.rating[r.id] !== sig) { outbox.rating[r.id] = sig; send('rating', r); } });
+  (sharedState.orders || []).forEach(o => {
+    const k = orderKey(o);
+    if (mirrorSeen.has(o.id)) {
+      const n = normalizeArray(o.pendingItems), had = outbox.pend[o.id] || 0;
+      if (n.length > had) {
+        send('addon', { orderId: o.id, table: o.table, pendingItems: n.slice(had), pendingTip: (Number(o.pendingTip) || 0) - (outbox.pendTip[o.id] || 0), note: o.note || '' });
+        outbox.pend[o.id] = n.length; outbox.pendTip[o.id] = Number(o.pendingTip) || 0;
+      }
+    } else if (!outbox.orders.has(k)) { outbox.orders.add(k); send('order', o); }
+  });
 }
 
 function initSyncListeners() {
@@ -1210,25 +1360,7 @@ function initSyncListeners() {
   });
 
   if (dbRef) {
-    authReadyPromise.then(() => dbRef.once('value')).then((snap) => {
-      if (snap.exists()) {
-        handleIncomingState(snap.val());
-      } else if (!hasShownInitialSpecial && currentTab === 'customer' && sharedState.houseSpecial.active) {
-        hasShownInitialSpecial = true;
-        openSpecialPopup(false);
-      }
-      dbRef.on('value', (liveSnap) => {
-        if (liveSnap.exists()) {
-          handleIncomingState(liveSnap.val());
-        }
-      });
-    });
-
-    setInterval(() => {
-      if (dbRef) {
-        dbRef.once('value').then(s => { if (s.exists()) handleIncomingState(s.val()); });
-      }
-    }, 12000);
+    authReadyPromise.then(() => startSync());
   } else if (!hasShownInitialSpecial && currentTab === 'customer' && sharedState.houseSpecial.active) {
     hasShownInitialSpecial = true;
     openSpecialPopup(false);
@@ -1424,6 +1556,53 @@ function getLast24HoursAlerts() {
   return (sharedState.alerts || []).filter(a => isWithinLast24Hours(a));
 }
 
+// ==================== ORDER ARCHIVE (ዳታ ሳይጠፋ ዋናውን ዝርዝር ቀላል ማድረግ) ====================
+const LIVE_DAYS = 3, LIVE_MS = LIVE_DAYS * 24 * 60 * 60 * 1000;
+let archiving = false, lastArchiveTry = 0, archCache = { key: null, at: 0, data: [] };
+const orderKey = o => `${o.id}_${o.createdTs}`;
+
+async function fetchArchivedOrders(cutoffTs) {
+  if (!db || !isStaffUser(authUser)) return [];
+  const key = Math.floor(cutoffTs / 3600000);
+  if (archCache.key === key && Date.now() - archCache.at < 300000) return archCache.data;
+  const snap = await db.ref('orders_archive').orderByChild('createdTs').startAt(cutoffTs).once('value');
+  const out = [];
+  snap.forEach(c => { const o = c.val(); o.items = normalizeArray(o.items); o.pendingItems = normalizeArray(o.pendingItems); out.push(o); });
+  archCache = { key, at: Date.now(), data: out };
+  return out;
+}
+
+// ከ cutoffTs ጀምሮ ያሉ ሁሉንም ትዕዛዞች (ዋናው ዝርዝር + ማህደር) ያመጣል
+async function getOrdersSince(cutoffTs) {
+  const live = (sharedState.orders || []).filter(o => (o.createdTs || Date.now()) >= cutoffTs);
+  if (cutoffTs >= Date.now() - LIVE_MS) return live;
+  let arch = [];
+  try { arch = await fetchArchivedOrders(cutoffTs); } catch (e) { console.error(e); showToast('⚠️ ማህደሩን ማንበብ አልተቻለም'); }
+  const seen = new Set(live.map(orderKey));
+  return [...live, ...arch.filter(o => !seen.has(orderKey(o)))];
+}
+
+// የቆዩ የተከፈሉ ትዕዛዞችን መጀመሪያ ማህደር ውስጥ ይጽፋል፤ መጻፉ ከተረጋገጠ በኋላ ብቻ ከዋናው ዝርዝር ያስወጣል
+async function archiveOldOrders() {
+  if (archiving || !db || !isStaffUser(authUser) || Date.now() - lastArchiveTry < 60000) return;
+  const cutoff = Date.now() - LIVE_MS;
+  const old = (sharedState.orders || []).filter(o => o.status === 'paid' && o.createdTs && o.createdTs < cutoff).slice(0, 100);
+  if (!old.length) return;
+  archiving = true; lastArchiveTry = Date.now();
+  try {
+    const upd = {};
+    old.forEach(o => { upd['orders_archive/' + orderKey(o)] = JSON.parse(JSON.stringify({ ...o, archivedAt: Date.now() })); });
+    await db.ref().update(upd);
+    const done = new Set(old.map(orderKey));
+    sharedState.orders = sharedState.orders.filter(o => !done.has(orderKey(o)));
+    sharedState.alerts = (sharedState.alerts || []).filter(a => Number(a.ts || Date.now()) >= cutoff);
+    archCache.key = null;
+    saveSharedState();
+    console.log(`Archived ${old.length} orders`);
+  } catch (e) { console.error('Archive failed (ዳታ አልተሰረዘም):', e); }
+  finally { archiving = false; }
+}
+
 // ==================== 8. ROUTING ====================
 function initRouting() {
   const params = new URLSearchParams(window.location.search);
@@ -1521,6 +1700,7 @@ function toggleModal(id, show) {
 
 // ==================== 9. CUSTOMER LOGIC ====================
 function updateTableModeBadge() {
+  setTimeout(() => { try { watchMyTable(); } catch (e) {} }, 0);
   const badge = document.getElementById('table-mode-badge');
   if (!badge) return;
   if (customerTable === 'Takeaway') {
@@ -2725,7 +2905,7 @@ function showFiscalReceiptGuide(orderId) {
 }
 
 // Multi-Period Word (.doc) Report Export
-function downloadWordReport(periodKey = 'today') {
+async function downloadWordReport(periodKey = 'today') {
   toggleModal('modal-report-options', false);
 
   const periodConfig = {
@@ -2741,7 +2921,8 @@ function downloadWordReport(periodKey = 'today') {
   const cfg = periodConfig[periodKey] || periodConfig.today;
   const cutoffTs = Date.now() - (cfg.days * 24 * 60 * 60 * 1000);
 
-  const filteredOrders = sharedState.orders.filter(o => (o.createdTs || Date.now()) >= cutoffTs);
+  showToast('⏳ ሪፖርቱ እየተዘጋጀ ነው...');
+  const filteredOrders = await getOrdersSince(cutoffTs);
   const paid = filteredOrders.filter(o => o.status === 'paid');
 
   const totalRev = paid.reduce((s, o) => s + Number(o.total || 0), 0);
@@ -2867,6 +3048,7 @@ async function submitDeliveryOrder() {
   sharedState.orders.unshift(order);
   sharedState.alerts.unshift({ id: `deliv_alt_${Date.now()}`, channel: 'customer', text: `🛵 አዲስ ዲሊቨሪ ${id} (${name} - ${phone}): ${items.filter(i => i.cat !== 'service').map(i => i.qty + 'x ' + i.am).join('، ')} [${address || 'ካርታ'}] 🧾 የክፍያ ማረጋገጫ ተያይዟል — እባክዎ ያረጋግጡ`, seen: false, ts: Date.now(), time: nowTime() });
   localStorage.setItem('riverside_my_delivery', id);
+  setTimeout(watchMyDelivery, 0);
   delivCart = {}; delivLoc = null;
   saveSharedState();
   toggleModal('modal-delivery', false);
@@ -2963,6 +3145,7 @@ try {
     authUser = u;
     if (!u) { firebase.auth().signInAnonymously().catch(e => { console.warn('anon auth', e); authResolve(); }); return; }
     authResolve();
+    if (typeof startSync === 'function' && typeof dbRef !== 'undefined' && dbRef) startSync();
     if (typeof renderAllViews === 'function' && document.readyState !== 'loading') { try { renderAllViews(); } catch (e) {} }
   });
 } catch (e) { console.warn('Auth init failed', e); authResolve(); }
@@ -3020,6 +3203,7 @@ function callWaiter(type) {
   lastCallAt = Date.now(); lastCallId = `call_${lastCallAt}`;
   sharedState.alerts.unshift({ id: lastCallId, channel: 'customer', isCall: true, text: `🔔 ${loc}: ${labels[type]}!`, seen: false, ts: lastCallAt, time: nowTime() });
   saveSharedState(); document.getElementById('waiter-menu').classList.add('hidden');
+  if (db && syncMode === 'customer') { const r = db.ref('call_status/' + lastCallId), id = lastCallId; const cb = sn => { if (sn.val()) { const a = (sharedState.alerts || []).find(x => x.id === id); if (a) a.seen = true; renderExtras(); r.off('value', cb); } }; r.on('value', cb); }
   showToast('🔔 ጥሪዎ ለካሸሩ ተልኳል!');
 }
 
@@ -3031,11 +3215,11 @@ function barChart(vals, labels, color) {
   return `<div class="flex items-end gap-1 h-28">${vals.map((v, i) => `<div class="flex-1 flex flex-col justify-end items-center min-w-0" title="${labels[i]}: ${v}"><div style="height:${Math.round(v / max * 100)}%;min-height:${v ? 2 : 0}px" class="w-full ${color} rounded-t"></div></div>`).join('')}</div>
     <div class="flex gap-1 text-[9px] text-gray-500">${labels.map((l, i) => `<div class="flex-1 text-center truncate">${(labels.length > 12 && i % 3) ? '' : l}</div>`).join('')}</div>`;
 }
-function renderDashboard() {
+async function renderDashboard() {
   const el = document.getElementById('cashier-dashboard'); if (!el) return;
   document.querySelectorAll('.dash-btn').forEach(b => { const on = b.id === `dash-btn-${dashDays}`; b.classList.toggle('bg-emerald-700', on); b.classList.toggle('text-white', on); });
   const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (dashDays - 1));
-  const paid = (sharedState.orders || []).filter(o => o.status === 'paid' && (o.createdTs || 0) >= start.getTime());
+  const paid = (await getOrdersSince(start.getTime())).filter(o => o.status === 'paid');
   const rev = paid.reduce((a, o) => a + Number(o.total || 0), 0);
   const rts = normalizeArray(sharedState.ratings).filter(r => (r.ts || 0) >= start.getTime());
   const avg = rts.length ? (rts.reduce((a, r) => a + r.stars, 0) / rts.length).toFixed(1) : '—';
@@ -3088,6 +3272,7 @@ function saveExtraPrices() {
 }
 function renderExtras() {
   renderExtrasManager();
+  archiveOldOrders();
   renderTracker(); renderDashboard(); renderDeliveryPanel();
   const w = document.getElementById('waiter-widget');
   if (w) w.classList.toggle('hidden', currentTab !== 'customer');
